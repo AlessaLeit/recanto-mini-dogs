@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - ${POSTGRES_PORT}:"5432:5432"
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -36,14 +36,14 @@ services:
     ports:
       - ${BACKEND_PORT}:8000
     depends_on:
-      POSTGRES_LOCAL:
+      postgres_local:
         condition: service_healthy
-      REDIS:
-        condition: service_healthy
+      redis:
+        condition: service_started
     volumes:
       - ./backend:/app
-    command: uvicorn main:app --host 0.0.0.0 --port ${BACKEND_PORT} -a-log-level debug
-    restart: unvicon-stopped
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --log-level debug
+    restart: unless-stopped
     networks:
       - petshop_network
 
@@ -58,6 +58,25 @@ services:
       - backend
     networks:
       - petshop_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: petshop_redis
+    networks:
+      - petshop_network
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: petshop_prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - petshop_network
+
+networks:
+  petshop_network:
+    driver: bridge
 
 volumes:
   pgdata:
