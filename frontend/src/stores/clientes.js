@@ -5,6 +5,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import api from '../api/index.js'
 import { clienteApi } from '../api/clientes'
+import { cachorroApi } from '../api/cachorros'
 
 export const useClientesStore = defineStore('clientes', () => {
   // State
@@ -91,7 +92,7 @@ export const useClientesStore = defineStore('clientes', () => {
     }
   }
 
-  // Nova ação: adicionar cachorro e refresh cliente específico
+// Nova ação: adicionar cachorro e refresh cliente específico
   async function adicionarCachorro(clienteId, data) {
     try {
       await api.post('/cachorros/', data)
@@ -103,7 +104,31 @@ export const useClientesStore = defineStore('clientes', () => {
     }
   }
 
-  return {
+  // Atualizar cachorro
+  async function atualizarCachorro(clienteId, cachorroId, data) {
+    try {
+      const response = await cachorroApi.atualizar(cachorroId, data)
+      // Refresh lista completa para atualizar a UI
+      await fetchClientes()
+      return response.data
+    } catch (err) {
+      throw err.response?.data?.detail || 'Erro ao atualizar cachorro'
+    }
+  }
+
+  // Deletar cachorro
+  async function deletarCachorro(clienteId, cachorroId) {
+    try {
+      await cachorroApi.deletar(cachorroId)
+      // Refresh lista completa para atualizar a UI
+      await fetchClientes()
+      return true
+    } catch (err) {
+      throw err.response?.data?.detail || 'Erro ao deletar cachorro'
+    }
+  }
+
+return {
     clientes,
     clienteAtual,
     loading,
@@ -115,7 +140,9 @@ export const useClientesStore = defineStore('clientes', () => {
     criarCliente,
     atualizarCliente,
     deletarCliente,
-    adicionarCachorro
+    adicionarCachorro,
+    atualizarCachorro,
+    deletarCachorro
   }
 })
 

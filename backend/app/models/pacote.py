@@ -88,6 +88,21 @@ class Pacote(Base):
             return "pago"
         return "parcial"
     
+    @property
+    def total_agendamentos(self) -> int:
+        """Retorna o total de agendamentos vinculados"""
+        return len(self.agendamentos) if self.agendamentos else 0
+
+    @property
+    def pet_nome(self) -> Optional[str]:
+        """Retorna o nome do pet vinculado"""
+        return self.cachorro.nome if self.cachorro else None
+
+    @property
+    def cliente_nome(self) -> Optional[str]:
+        """Retorna o nome do cliente vinculado"""
+        return self.cachorro.cliente.nome if self.cachorro and self.cachorro.cliente else None
+
     def to_dict(self) -> dict:
         """Serialização completa incluindo pet nome e agendamentos para frontend."""
         return {

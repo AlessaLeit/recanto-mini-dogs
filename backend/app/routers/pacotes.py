@@ -3,13 +3,12 @@ Router Pacotes - CRUD, pagamento, geração automática agend
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
-from typing import List
+from typing import List, Any
 from app.database import get_db
 from app import models, schemas
 from app.services.pacote_service import PacoteService
 
 router = APIRouter(
-    prefix="/pacotes",
     tags=["Pacotes"],
     redirect_slashes=True,
     responses={status.HTTP_404_NOT_FOUND: {"description": "Pacote não encontrado"}}
@@ -45,7 +44,11 @@ def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Session = Depends(get_d
         raise HTTPException(status_code=404, detail="Cachorro não encontrado ou inativo")
     
     # Cria o pacote
-    db_pacote = models.Pacote(**pacote_criar.dict())
+    dados_pacote = pacote_criar.model_dump()
+    dados_pacote.pop('limite_banhos_mes', None)
+    dados_pacote.pop('status_pagamento', None)
+    
+    db_pacote = models.Pacote(**dados_pacote)
     db.add(db_pacote)
     db.commit()
     db.refresh(db_pacote)
@@ -72,7 +75,7 @@ def atualizar_pacote(pacote_id: int, pacote_atualizar: schemas.PacoteUpdate, db:
     if not pacote:
         raise HTTPException(status_code=404, detail="Pacote não encontrado")
     
-    update_data = pacote_atualizar.dict(exclude_unset=True)
+    update_data = pacote_atualizar.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(pacote, field, value)
     
@@ -103,3 +106,29 @@ def registrar_pagamento(
     data = date.fromisoformat(data_pagamento)
     result = service.registrar_pagamento(pacote_id, valor_pago, data)
     return result
+
+@router.get("/{pacote_id}/agendamentos", response_model=List[schemas.AgendamentoResponse])
+def listar_agendamentos_pacote(pacote_id: int, db: Session = Depends(get_db)):
+    """Lista agendamentos vinculados a um pacote específico."""
+    agendamentos = db.query(models.Agendamento).filter(
+        models.Agendamento.pacote_id == pacote_id
+    ).order_by(models.Agendamento.data_banho).all()
+    return agendamentos
+
+@router.post("/{pacote_id}/agendamento-extra", response_model=schemas.AgendamentoResponse)
+def adicionar_agendamento_extra(
+    pacote_id: int, 
+    data_banho: str, 
+    db: Session = Depends(get_db)
+):
+    """Cria um agendamento extra sem validar o limite do plano."""
+    from datetime import date
+    db_ag = models.Agendamento(
+        pacote_id=pacote_id,
+        data_banho=date.fromisoformat(data_banho),
+        status_presenca="pendente"
+    )
+    db.add(db_ag)
+    db.commit()
+    db.refresh(db_ag)
+    return db_ag

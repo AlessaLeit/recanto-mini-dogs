@@ -41,6 +41,9 @@ class Cachorro(Base):
     # Observações gerais sobre o cachorro (alergias, comportamento, etc)
     observacoes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
+    # Status de ativação do pet
+    ativo: Mapped[bool] = mapped_column(default=True)
+    
     # Relacionamentos
     cliente: Mapped["Cliente"] = relationship(back_populates="cachorros")
     

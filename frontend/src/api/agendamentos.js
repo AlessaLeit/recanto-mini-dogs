@@ -6,7 +6,9 @@ import api from './index'
 export const agendamentosApi = {
   // Dashboard: listar por data específica
   listarDashboard: (data = null) => {
-    const endpoint = data ? `/agendamentos/dashboard/${data}` : '/agendamentos/dashboard'
+    // Garante que sempre envie uma data no formato YYYY-MM-DD para evitar 404
+    const dateParam = data || new Date().toISOString().split('T')[0]
+    const endpoint = `/agendamentos/dashboard/${dateParam}`
     return api.get(endpoint)
   },
   
@@ -15,4 +17,3 @@ export const agendamentosApi = {
 }
 
 export default agendamentosApi
-
