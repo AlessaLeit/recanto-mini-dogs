@@ -3,7 +3,7 @@ Schemas Pydantic v2 para Pacote.
 """
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Any
-from datetime import datetime
+from datetime import datetime, date
 from enum import Enum
 
 class TipoPlano(str, Enum):
@@ -43,9 +43,9 @@ class PacoteResponse(BaseModel):
     tipo_plano: str
     valor_cobrado: float
     valor_pago: Optional[float] = None
-    data_pagamento: Optional[str] = None
+    data_pagamento: Optional[date] = None
     ativo: bool
-    criado_em: str
+    criado_em: datetime
     pet_nome: Optional[str] = None
     cliente_nome: Optional[str] = None
     status_pagamento: str
@@ -60,4 +60,3 @@ class PacoteWithBanhos(PacoteResponse):
 
 class PacoteWithAgendamentos(PacoteResponse):
     agendamentos: List[Any] = []
-

@@ -6,7 +6,7 @@ import axios from 'axios'
 
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1',
 
   headers: {
     'Content-Type': 'application/json'
@@ -17,7 +17,8 @@ const api = axios.create({
 // Interceptor para logging em desenvolvimento
 api.interceptors.request.use(
   (config) => {
-    console.log(`[API] ${config.method.toUpperCase()} ${config.url}`)
+    const fullPath = config.baseURL ? `${config.baseURL}${config.url}` : config.url
+    console.log(`[API Request] ${config.method.toUpperCase()} ${fullPath}`)
     return config
   },
   (error) => Promise.reject(error)
@@ -27,8 +28,13 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message = error.response?.data?.detail || 'Erro na requisição'
-    console.error('[API Error]', message)
+    let message = 'Erro na requisição'
+    if (!error.response) {
+      message = 'Não foi possível conectar ao servidor. Verifique se o backend está rodando.'
+    } else {
+      message = error.response?.data?.detail || message
+    }
+    console.error('[API Error]', message, error.config?.method?.toUpperCase(), error.config?.url)
     return Promise.reject(error)
   }
 )

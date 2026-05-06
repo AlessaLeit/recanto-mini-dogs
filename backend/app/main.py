@@ -34,6 +34,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",  # Vite dev server
+        "http://127.0.0.1:5173",  # Vite dev server (IP)
         "http://localhost:3000",  # Alternativa comum
         "http://localhost",       # Nginx frontend container
         "http://127.0.0.1",       # Localhost alternativo
