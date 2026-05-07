@@ -64,11 +64,34 @@
               <option value="mensal">Mensal (1 banho/mês)</option>
             </select>
           </div>
+
+          <div class="form-group">
+            <label>Dia da Semana</label>
+            <select v-model="novoPacote.dia_da_semana" required>
+              <option value="terca">Terça</option>
+              <option value="quarta">Quarta</option>
+              <option value="quinta">Quinta</option>
+              <option value="sexta">Sexta</option>
+              <option value="sabado">Sábado</option>
+            </select>
+          </div>
+
           
           <div class="form-group">
-            <label>Valor Cobrado (R$)</label>
-            <input v-model.number="novoPacote.valor_cobrado" type="number" step="0.01" required />
+            <label>Valor Base do Banho (R$)</label>
+            <input v-model.number="novoPacote.valor_base_banho" type="number" step="0.01" required />
           </div>
+          
+          <div class="form-group">
+            <label>Valor Cobrado (R$) - recalculado automaticamente</label>
+            <input
+              :value="valorCobradoCalculado"
+              type="number"
+              step="0.01"
+              disabled
+            />
+          </div>
+
           
           <div class="form-actions">
             <button type="button" @click="showNovoPacote = false" class="btn">Cancelar</button>
@@ -111,8 +134,13 @@ const cachorroId = computed(() => parseInt(route.query.cachorro_id) || null)
 const novoPacote = ref({
   cachorro_id: null,
   tipo_plano: 'semanal',
+  dia_da_semana: 'terca',
+  // Base do banho (preço por agendamento)
+  valor_base_banho: 0,
+  // Valor total do pacote (base * quantidade do plano)
   valor_cobrado: 0
 })
+
 
 const cachorros = computed(() => {
   const lista = []
@@ -165,16 +193,40 @@ async function confirmarPagamento(dados) {
   }
 }
 
+const valorCobradoCalculado = computed(() => {
+  const base = Number(novoPacote.value.valor_base_banho || 0)
+  const qtd = novoPacote.value.tipo_plano === 'semanal' ? 4 : novoPacote.value.tipo_plano === 'quinzenal' ? 2 : 1
+  return base * qtd
+})
+
+
 async function criarPacote() {
   try {
-    await pacotesStore.criarPacote(novoPacote.value)
+    const payload = {
+      cachorro_id: novoPacote.value.cachorro_id,
+      tipo_plano: novoPacote.value.tipo_plano,
+      dia_da_semana: novoPacote.value.dia_da_semana,
+      valor_cobrado: valorCobradoCalculado.value,
+    }
+
+
+    await pacotesStore.criarPacote(payload)
+
     showNovoPacote.value = false
-    novoPacote.value = { cachorro_id: null, tipo_plano: 'semanal', valor_cobrado: 0 }
+    novoPacote.value = {
+      cachorro_id: null,
+      tipo_plano: 'semanal',
+      dia_da_semana: 'terca',
+      valor_base_banho: 0,
+      valor_cobrado: 0,
+    }
     alert('Pacote criado com sucesso!')
   } catch (err) {
-    alert('Erro ao criar pacote: ' + err)
+    alert('Erro ao criar pacote: ' + (err?.response?.data?.detail || err.message || err))
   }
 }
+
+
 
 function verDetalhes(pacote) {
   router.push(`/pacotes/${pacote.id}`)

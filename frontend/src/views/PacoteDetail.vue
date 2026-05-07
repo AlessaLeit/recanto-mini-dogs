@@ -19,14 +19,22 @@
         <span class="value">{{ pacote?.tipo_plano?.toUpperCase() }}</span>
         <span class="sub">{{ pacote?.limite_banhos_mes }} banhos/mês</span>
       </div>
+
+      <div class="info-card">
+        <span class="label">Dia da Semana</span>
+        <span class="value">{{ formatarDiaSemana(pacote?.dia_da_semana) }}</span>
+        <span class="sub">Datas geradas automaticamente</span>
+      </div>
+
       <div class="info-card">
         <span class="label">Valor Base do Banho</span>
-        <span class="value">R$ {{ formatarValor(pacote?.valor_banho_base) }}</span>
+        <span class="value">R$ {{ formatarValor(pacote?.valor_banho_base || 0) }}</span>
       </div>
       <div class="info-card">
         <span class="label">Valor Cobrado (Pacote)</span>
         <span class="value">R$ {{ formatarValor(pacote?.valor_cobrado) }}</span>
       </div>
+
       <div class="info-card">
         <span class="label">Total Agendamentos</span>
         <span class="value">{{ pacote?.total_agendamentos || 0 }}</span>
@@ -209,6 +217,18 @@ function formatarValor(valor) {
     maximumFractionDigits: 2
   })
 }
+
+function formatarDiaSemana(dia) {
+  const map = {
+    terca: 'Terça',
+    quarta: 'Quarta',
+    quinta: 'Quinta',
+    sexta: 'Sexta',
+    sabado: 'Sábado'
+  }
+  return map[dia] || '-' 
+}
+
 
 // Editar Data
 function abrirEditarData(ag) {

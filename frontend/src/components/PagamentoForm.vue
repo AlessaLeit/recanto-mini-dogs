@@ -59,9 +59,11 @@ const form = ref({
 
 watch(() => props.pacote, (novo) => {
   if (novo) {
+    // 'valor_cobrado' já deve vir calculado no backend (base * quantidade do plano)
     form.value.valor_pago = novo.valor_cobrado
   }
 })
+
 
 function handleSubmit() {
   emit('confirmar', {
