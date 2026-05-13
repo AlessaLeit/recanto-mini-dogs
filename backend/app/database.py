@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     API_PORT: int = 8000
     DEBUG: bool = True
     
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
@@ -25,7 +26,7 @@ class Settings(BaseSettings):
 # Instância global das configurações
 settings = Settings()
 
-# ✅ CORREÇÃO: Força SQLite quando rodando localmente (fora do Docker)
+# Força SQLite quando rodando localmente (fora do Docker)
 # Se o .env apontar para PostgreSQL com host "db", usa SQLite local
 _database_url = settings.DATABASE_URL
 if "postgresql" in _database_url and "@db:" in _database_url:

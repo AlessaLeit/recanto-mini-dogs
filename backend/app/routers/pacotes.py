@@ -8,11 +8,13 @@ from typing import List, Any, Optional
 from app.database import get_db
 from app import models, schemas
 from app.services.pacote_service import PacoteService
+from app.auth import get_current_user
 
 router = APIRouter(
     tags=["Pacotes"],
     redirect_slashes=True,
-    responses={status.HTTP_404_NOT_FOUND: {"description": "Pacote não encontrado"}}
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Pacote não encontrado"}},
+    dependencies=[Depends(get_current_user)]
 )
 
 @router.get("/", response_model=List[schemas.PacoteResponse])
@@ -21,17 +23,28 @@ def listar_pacotes(
     db: Session = Depends(get_db)
 ):
     """Lista pacotes (ativos por padrão; usa incluir_inativos=true para todos)."""
-    query = db.query(models.Pacote)\
-        .options(
-            joinedload(models.Pacote.cachorro).joinedload(models.Cachorro.cliente)
-        )\
-        .order_by(models.Pacote.criado_em.desc())
-    
+    query = db.query(models.Pacote).options(
+        joinedload(models.Pacote.cachorro).joinedload(models.Cachorro.cliente),
+        joinedload(models.Pacote.agendamentos)  # Garante que os agendamentos sejam carregados
+    ).order_by(models.Pacote.criado_em.desc())
+
     if not incluir_inativos:
-        query = query.filter(models.Pacote.ativo == True)
-    
+        # Usamos filter(or_...) caso existam registros legados com 'ativo' como NULL
+        from sqlalchemy import or_
+        query = query.filter(or_(models.Pacote.ativo == True, models.Pacote.ativo == None))
+
     pacotes = query.all()
-    return pacotes
+
+    # Padroniza o retorno usando to_dict() para cada item, 
+    # mantendo a consistência com 'obter_pacote' e 'criar_pacote'.
+    resultado = []
+    for p in pacotes:
+        p_dict = p.to_dict()
+        ags = getattr(p, 'agendamentos', []) or []
+        p_dict['agendamentos'] = [ag.to_dict() for ag in ags]
+        resultado.append(p_dict)
+
+    return resultado
 
 @router.post("/", response_model=schemas.PacoteResponse, status_code=status.HTTP_201_CREATED)
 def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Session = Depends(get_db)):
@@ -49,6 +62,10 @@ def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Session = Depends(get_d
     dados_pacote.pop('limite_banhos_mes', None)
     dados_pacote.pop('status_pagamento', None)
     
+    # Garante que o pacote seja criado como ativo explicitamente
+    if 'ativo' not in dados_pacote:
+        dados_pacote['ativo'] = True
+
     db_pacote = models.Pacote(**dados_pacote)
     db.add(db_pacote)
     db.commit()
@@ -178,15 +195,38 @@ def atualizar_pacote(pacote_id: int, pacote_atualizar: schemas.PacoteUpdate, db:
     
     db.commit()
     db.refresh(pacote)
-    return pacote
+
+    # Padroniza o retorno usando to_dict() para evitar erros de serialização
+    pacote_dict = pacote.to_dict()
+    agendamentos = getattr(pacote, 'agendamentos', None) or []
+    pacote_dict['agendamentos'] = [ag.to_dict() for ag in agendamentos]
+    return pacote_dict
 
 @router.delete("/{pacote_id}", status_code=status.HTTP_204_NO_CONTENT)
-def deletar_pacote(pacote_id: int, db: Session = Depends(get_db)):
-    """Remove pacote (soft-delete: seta ativo=False)."""
+def deletar_pacote(
+    pacote_id: int, 
+    force: bool = Query(False, description="Se True, remove permanentemente do banco"),
+    db: Session = Depends(get_db)
+):
+    """
+    Remove pacote. 
+    Por padrão realiza soft-delete (ativo=False) e remove agendamentos pendentes da agenda.
+    Use force=true para remoção física completa do banco de dados.
+    """
     pacote = db.query(models.Pacote).filter(models.Pacote.id == pacote_id).first()
     if not pacote:
         raise HTTPException(status_code=404, detail="Pacote não encontrado")
-    pacote.ativo = False
+
+    if force:
+        db.delete(pacote)
+    else:
+        pacote.ativo = False
+        # Ao desativar, limpamos agendamentos futuros que ainda não foram realizados
+        db.query(models.Agendamento).filter(
+            models.Agendamento.pacote_id == pacote_id,
+            models.Agendamento.status_presenca == "pendente"
+        ).delete(synchronize_session=False)
+
     db.commit()
     return None
 
