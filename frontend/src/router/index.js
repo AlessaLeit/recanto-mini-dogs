@@ -7,12 +7,19 @@ import Dashboard from '../views/Dashboard.vue'
 import Pacotes from '../views/Pacotes.vue'
 import Clientes from '../views/Clientes.vue'
 import Relatorios from '../views/Relatorios.vue'
+import Login from '../views/Login.vue'
+import { useAuthStore } from '../stores/auth'
 
 const routes = [
   {
     path: '/',
     name: 'Dashboard',
     component: Dashboard
+  },
+  {
+    path: '/login',
+    name: 'Login',
+    component: Login
   },
   {
     path: '/pacotes',
@@ -39,6 +46,17 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+router.beforeEach((to, from, next) => {
+  const authStore = useAuthStore()
+  const publicPages = ['/login']
+  const authRequired = !publicPages.includes(to.path)
+
+  if (authRequired && !authStore.isAuthenticated) {
+    return next('/login')
+  }
+  next()
 })
 
 export default router

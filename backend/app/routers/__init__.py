@@ -8,10 +8,12 @@ from .pacotes import router as pacotes_router
 from .banhos import router as banhos_router
 from .relatorios import router as relatorios_router
 from .agendamentos import router as agendamentos_router
+from app.auth import router as auth_router
 
 # Router principal que agrega todos os sub-routers
 api_router = APIRouter()
 
+api_router.include_router(auth_router)
 api_router.include_router(clientes_router, prefix="/clientes", tags=["Clientes"])
 api_router.include_router(cachorros_router, prefix="/cachorros", tags=["Cachorros"])
 api_router.include_router(pacotes_router, prefix="/pacotes", tags=["Pacotes"])
