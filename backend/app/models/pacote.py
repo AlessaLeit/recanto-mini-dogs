@@ -50,6 +50,9 @@ class Pacote(Base):
     # Valor acordado para o pacote (valor_banho_base * quantidade do plano)
     valor_cobrado: Mapped[float] = mapped_column(Float, nullable=False)
 
+    # Valor de transporte para o pacote
+    valor_transporte: Mapped[float] = mapped_column(Float, default=0.0, server_default="0.0", nullable=False)
+
 
     # Dia da semana escolhido para gerar agendamentos automáticos
     dia_da_semana: Mapped[DiaSemana] = mapped_column(
@@ -136,6 +139,7 @@ class Pacote(Base):
 
             "valor_banho_base": self.valor_banho_base,
             "valor_cobrado": self.valor_cobrado,
+            "valor_transporte": self.valor_transporte,
             "valor_pago": self.valor_pago,
             "data_pagamento": self.data_pagamento.isoformat() if self.data_pagamento else None,
             "ativo": self.ativo,
@@ -153,4 +157,3 @@ class Pacote(Base):
             f"<Pacote(id={self.id}, tipo='{self.tipo_plano.value}', "
             f"dia='{self.dia_da_semana.value}', ativo={self.ativo})>"
         )
-
