@@ -33,8 +33,30 @@
         <h2>📅 Calendário de Banhos</h2>
         <CalendarioMes :banhos="agendamentosStore.agendamentosDashboard" @data-selecionada="onDataSelecionada" />
       </div>
-      
+
       <div class="card">
+        <div class="card-header flex space-between">
+          <h2>📋 Agendamentos - {{ formatarData(dataSelecionada) }}</h2>
+          <button @click="carregarAgendamentos()" class="btn-small">↻</button>
+        </div>
+        <div v-if="agendamentosStore.agendamentosDashboard.length === 0" class="empty-state">
+          Nenhum agendamento nesta data. Clique no calendário para ver outros dias.
+        </div>
+        <div v-else class="agendamentos-list">
+          <div v-for="ag in agendamentosOrdenados" :key="ag.id" class="ag-card" :class="ag.status_presenca || 'pendente'">
+            <div class="ag-header">
+              <div class="pet-info" @click="abrirEditarStatus(ag)" title="Clique para alterar status">
+                <span class="status-dot" :class="`dot-${ag.status_presenca || 'pendente'}`"></span>
+                <h4>{{ ag.pet_nome || 'Pet' }}</h4>
+              </div>
+              <span class="status-badge" :class="`status-${ag.status_presenca || 'pendente'}`">{{ (ag.status_presenca || 'PENDENTE').toUpperCase() }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card">
         <h2>🛁 Últimos Banhos</h2>
         <div v-if="banhosRecentes.length === 0" class="empty-state">
           Nenhum banho registrado recentemente
@@ -46,39 +68,6 @@
           show-pacote
         />
       </div>
-    </div>
-    
-    <!-- Agendamentos do Dia -->
-    <div class="card">
-      <div class="card-header flex space-between">
-        <h2>📋 Agendamentos - {{ formatarData(dataSelecionada) }}</h2>
-        <button @click="carregarAgendamentos()" class="btn-small">↻</button>
-      </div>
-      <div v-if="agendamentosStore.agendamentosDashboard.length === 0" class="empty-state">
-        Nenhum agendamento nesta data. Clique no calendário para ver outros dias.
-      </div>
-      <div v-else class="agendamentos-list">
-        <div v-for="ag in agendamentosStore.agendamentosDashboard" :key="ag.id" class="ag-card" :class="ag.status_presenca || 'pendente'">
-          <div class="ag-header">
-            <div>
-              <h4>{{ ag.pet_nome || 'Pet' }}</h4>
-              <p class="cliente">{{ ag.cliente_nome || 'Cliente' }}</p>
-            </div>
-            <span class="status-badge" :class="`status-${ag.status_presenca || 'pendente'}`">{{ (ag.status_presenca || 'PENDENTE').toUpperCase() }}</span>
-          </div>
-          <div class="ag-details">
-            <p>Pacote #{{ ag.pacote_id }} | {{ formatarData(ag.data_banho) }}</p>
-            <div v-if="ag.extras && Object.keys(ag.extras).length" class="extras">
-              <strong>Extras:</strong> {{ Object.entries(ag.extras).map(([k,v]) => `${k}: ${v}`).join(', ') }}
-            </div>
-          </div>
-          <div class="ag-actions">
-            <button @click="confirmarRemoverAgendamento(ag)" class="btn-excluir">Excluir</button>
-          </div>
-
-        </div>
-      </div>
-    </div>
 
     
     <div class="card">
@@ -103,7 +92,36 @@
       @confirmar="confirmarPagamento"
     />
     
+    <!-- Modal: Editar Status -->
+    <div class="modal-overlay" v-if="showModalEdit" @click.self="showModalEdit = false">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Atualizar Agendamento</h3>
+          <p class="pet-name-modal">🐶 {{ agEdit?.pet_nome }}</p>
+        </div>
 
+        <div class="form-group">
+          <label>Status de Presença</label>
+          <select v-model="agEdit.status_presenca">
+            <option value="pendente">🟡 PENDENTE</option>
+            <option value="concluido">🟢 CONCLUÍDO</option>
+            <option value="faltou">🔴 FALTOU / CANCELADO</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Serviços Extras / Observações</label>
+          <textarea 
+            v-model="agEdit.extras_str" 
+            rows="3" 
+            placeholder="Ex: Shampoo especial, Tosa higiênica..."
+          ></textarea>
+        </div>
+        <div class="modal-actions">
+          <button @click="showModalEdit = false" class="btn-secondary">Cancelar</button>
+          <button @click="salvarAgendamento" class="btn-primary">Salvar</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -126,6 +144,8 @@ const dataSelecionada = ref(new Date().toISOString().split('T')[0])
 
 const showPagamento = ref(false)
 const pacoteSelecionado = ref(null)
+const showModalEdit = ref(false)
+const agEdit = ref(null)
 
 // Computed
 const totalCachorros = computed(() => {
@@ -135,6 +155,15 @@ const totalCachorros = computed(() => {
 const pacotesEmAberto = computed(() => 
   pacotesStore.pacotes.filter(p => p.status_pagamento === 'em_aberto')
 )
+
+const agendamentosOrdenados = computed(() => {
+  const ordem = { 'pendente': 1, 'concluido': 2, 'faltou': 3 }
+  return [...agendamentosStore.agendamentosDashboard].sort((a, b) => {
+    const statusA = a.status_presenca || 'pendente'
+    const statusB = b.status_presenca || 'pendente'
+    return ordem[statusA] - ordem[statusB]
+  })
+})
 
 const banhosRecentes = computed(() => {
   const banhos = []
@@ -185,6 +214,16 @@ function onDataSelecionada(data) {
   carregarAgendamentos()
 }
 
+function abrirEditarStatus(ag) {
+  // Extrai apenas o texto de observação se existir, ou limpa o campo
+  const textoExtras = ag.extras?.info || (typeof ag.extras === 'string' ? ag.extras : '')
+  agEdit.value = { 
+    ...ag, 
+    extras_str: textoExtras 
+  }
+  showModalEdit.value = true
+}
+
 function formatarData(dataStr) {
   return new Date(dataStr).toLocaleDateString('pt-BR')
 }
@@ -204,11 +243,13 @@ function formatarData(dataStr) {
 
     async function salvarAgendamento() {
       try {
-        const extras = JSON.parse(agEdit.value.extras_str || '{}')
+        // Salva o texto dentro de um objeto estruturado para o backend
+        const extras = { info: agEdit.value.extras_str }
         await agendamentosStore.updateStatus(agEdit.value.id, {
           status_presenca: agEdit.value.status_presenca,
           extras: extras
         })
+        await carregarAgendamentos()
         showModalEdit.value = false
 
       } catch (err) {
@@ -239,6 +280,11 @@ onMounted(async () => {
 .ag-card.concluido { border-left: 4px solid #10b981; }
 .ag-card.faltou { border-left: 4px solid #ef4444; }
 .ag-header { display: flex; justify-content: space-between; align-items: flex-start; }
+.pet-info { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+.status-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.dot-pendente { background-color: #fbbf24; }
+.dot-concluido { background-color: #10b981; }
+.dot-faltou { background-color: #ef4444; }
 .status-badge { padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.75rem; font-weight: bold; }
 .status-pendente { background: #fef3c7; color: #92400e; }
 .status-concluido { background: #d1fae5; color: #065f46; }
@@ -246,12 +292,16 @@ onMounted(async () => {
 .btn-editar, .btn-small { background: #667eea; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
 .btn-small { padding: 0.25rem 0.5rem; font-size: 0.8rem; }
 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-.modal { background: white; padding: 2rem; border-radius: 8px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+.modal { background: white; padding: 2rem; border-radius: 12px; max-width: 400px; width: 90%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border-top: 6px solid #667eea; }
+.modal-header { margin-bottom: 1.5rem; }
+.modal-header h3 { margin: 0; color: #1a202c; }
+.pet-name-modal { margin: 0.25rem 0 0 0; color: #4a5568; font-weight: 600; font-size: 1.1rem; }
 .form-group { margin-bottom: 1rem; }
 .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
-.form-group select, .form-group textarea { width: 100%; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 4px; }
+.form-group select, .form-group textarea { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e0; border-radius: 6px; font-family: inherit; }
+.form-group textarea:focus { border-color: #667eea; outline: none; }
 .modal-actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem; }
-.btn-primary { background: #10b981; color: white; }
-.btn-secondary { background: #6b7280; color: white; }
+.btn-primary { background: #10b981; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: bold; }
+.btn-secondary { background: #edf2f7; color: #4a5568; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer; }
 .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
 </style>
