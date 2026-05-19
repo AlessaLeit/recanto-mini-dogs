@@ -141,7 +141,7 @@ def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Session = Depends(get_d
     # Para o detalhe, a UI usa PacoteDetail.vue que espera agendamentos no payload.
     # Para compatibilidade com a serialização Pydantic, retornamos somente campos escalares + agendamentos.
     # (PacoteResponse.agendamentos é List[Any], então aceitamos dicts).
-    return db_pacote
+    return schemas.PacoteResponse.model_validate(db_pacote).model_dump()
 
 
 

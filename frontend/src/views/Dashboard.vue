@@ -34,20 +34,6 @@
       </div>
 
       <div class="card">
-        <div class="card-title"><span class="card-title-bar"></span>🛁 Últimos Banhos</div>
-        <div v-if="banhosRecentes.length === 0" class="empty-state">
-          Nenhum banho registrado recentemente
-        </div>
-        <BanhoItem
-          v-for="banho in banhosRecentes"
-          :key="banho.id"
-          :banho="banho"
-          show-pacote
-        />
-      </div>
-    </div>
-
-    <div class="card">
       <div class="card-header-row">
         <div class="card-title" style="margin-bottom:0"><span class="card-title-bar"></span>📋 Agendamentos — {{ formatarData(dataSelecionada) }}</div>
         <button @click="carregarAgendamentos()" class="btn-refresh">↻ Atualizar</button>
@@ -79,7 +65,8 @@
           </div>
           <button @click="editarAgendamento(ag)" class="btn-editar">Editar</button>
         </div>
-      </div>
+      </div> 
+    </div>
     </div>
 
     <div class="card">

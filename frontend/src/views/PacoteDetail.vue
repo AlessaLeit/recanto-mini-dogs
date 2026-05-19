@@ -8,7 +8,7 @@
         <h1>{{ pacote?.pet_nome || 'Pacote' }}</h1>
         <p class="subheader">{{ pacote?.cliente_nome }}</p>
       </div>
-      <div class="status-pill" :class="pacote?.status_pagamento">
+      <div class="status-pill" :class="pacote?.status_pagamento" style="margin-right: 1rem;">
         {{ pacote?.status_pagamento?.toUpperCase() || 'EM ABERTO' }}
       </div>
     </div>
@@ -102,6 +102,12 @@
       <div v-else class="empty-state">
         Nenhum agendamento encontrado.
       </div>
+
+      <!-- Seção de Exclusão: Movida para o final do card de agendamentos -->
+      <div class="footer-danger-zone">
+        <span class="danger-text">Deseja encerrar este pacote permanentemente?</span>
+        <button @click="confirmarDeletarPacote" class="btn btn-perigo" title="Excluir este pacote">🗑️ Excluir Pacote</button>
+      </div>
     </div>
 
     <!-- ── MODAL: Editar Data ── -->
@@ -120,6 +126,22 @@
         <div class="modal-actions">
           <button @click="showEditData = false" class="btn btn-cancelar">Cancelar</button>
           <button @click="salvarNovaData" class="btn btn-primario" :disabled="!novaData">Salvar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MODAL: Confirmar Exclusão do Pacote Inteiro ── -->
+    <div class="modal" v-if="showConfirmDeletePacote">
+      <div class="modal-overlay" @click="showConfirmDeletePacote = false"></div>
+      <div class="modal-content">
+        <div class="modal-header modal-header-danger">
+          <h3>⚠️ Confirmar Exclusão</h3>
+        </div>
+        <p class="modal-info">Tem certeza que deseja excluir o pacote de <strong>{{ pacote?.pet_nome }}</strong>?</p>
+        <p class="warning-text">Isso desativará o pacote e removerá todos os agendamentos pendentes. Esta ação não pode ser desfeita.</p>
+        <div class="modal-actions">
+          <button @click="showConfirmDeletePacote = false" class="btn btn-cancelar">Cancelar</button>
+          <button @click="executarDeletarPacote" class="btn btn-perigo">Excluir Permanentemente</button>
         </div>
       </div>
     </div>
@@ -267,6 +289,7 @@ const loading = ref(false)
 const showEditData = ref(false)
 const showAddExtra = ref(false)
 const showConfirmRemove = ref(false)
+const showConfirmDeletePacote = ref(false)
 const showModalExtras = ref(false)
 const showModalEditPacote = ref(false)
 
@@ -402,6 +425,20 @@ function confirmarRemover(ag) {
   showConfirmRemove.value = true
 }
 
+function confirmarDeletarPacote() {
+  showConfirmDeletePacote.value = true
+}
+
+async function executarDeletarPacote() {
+  try {
+    await pacotesStore.deletarPacote(pacoteId.value)
+    alert('Pacote excluído com sucesso!')
+    router.push('/pacotes')
+  } catch (err) {
+    alert('Erro ao excluir pacote: ' + err)
+  }
+}
+
 async function executarRemover() {
   if (!agRemovendo.value) return
   try {
@@ -535,6 +572,21 @@ onMounted(carregarPacote)
   margin-bottom: 1.4rem;
   display: flex;
   justify-content: flex-end;
+}
+
+.footer-danger-zone {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px dashed var(--creme-escuro);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.danger-text {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 
 /* ── AGENDAMENTOS SECTION ── */
