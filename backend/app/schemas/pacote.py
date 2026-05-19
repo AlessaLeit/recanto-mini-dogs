@@ -9,6 +9,8 @@ from typing import Any, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .agendamento import AgendamentoResponse
+
 
 class TipoPlano(str, Enum):
     MENSAL = "mensal"
@@ -84,15 +86,14 @@ class PacoteResponse(BaseModel):
 
     limite_banhos_mes: int
     total_agendamentos: int
-    agendamentos: List[Any] = []
+    agendamentos: List[AgendamentoResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class PacoteWithBanhos(PacoteResponse):
-    banhos: List[Any] = []
+    banhos: List[Any] = []  
 
 
 class PacoteWithAgendamentos(PacoteResponse):
-    agendamentos: List[Any] = []
-
+    agendamentos: List[AgendamentoResponse] = []
