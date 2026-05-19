@@ -20,8 +20,7 @@ def criar_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
     db.add(db_cliente)
     db.commit()
     db.refresh(db_cliente)
-    return db_cliente
-
+    
 
 @router.get("/", response_model=List[ClienteWithCachorros])
 def listar_clientes(
@@ -43,7 +42,6 @@ def listar_clientes(
     clientes = query.offset(skip).limit(limit).all()
     return clientes
 
-
 @router.get("/{cliente_id}", response_model=ClienteWithCachorros)
 def obter_cliente(cliente_id: int, db: Session = Depends(get_db)):
     """
@@ -61,8 +59,8 @@ def obter_cliente(cliente_id: int, db: Session = Depends(get_db)):
 
 @router.put("/{cliente_id}", response_model=ClienteResponse)
 def atualizar_cliente(
-    cliente_id: int, 
-    cliente_update: ClienteUpdate, 
+    cliente_id: int,
+    cliente_update: ClienteUpdate,
     db: Session = Depends(get_db)
 ):
     """
@@ -80,7 +78,6 @@ def atualizar_cliente(
     db.commit()
     db.refresh(db_cliente)
     return db_cliente
-
 
 @router.delete("/{cliente_id}", status_code=status.HTTP_204_NO_CONTENT)
 def deletar_cliente(cliente_id: int, db: Session = Depends(get_db)):

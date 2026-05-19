@@ -11,7 +11,6 @@ from app.schemas import AgendamentoCreate, AgendamentoUpdate, AgendamentoRespons
 from app.services.pacote_service import PacoteService
 from app.models import Pacote, Cachorro, Cliente
 from datetime import date
-from app.models import Pacote, Cachorro
 
 router = APIRouter(tags=["Agendamentos"], redirect_slashes=True)
 
@@ -41,34 +40,42 @@ def listar_agendamentos(pacote_id: int, db: Session = Depends(get_db)):
 
 @router.get("/dashboard/{data}")
 def listar_agendamentos_data(data: str, db: Session = Depends(get_db)):
-        """
-        Lista agendamentos de data específica (YYYY-MM-DD) para dashboard.
-        Default: hoje se inválida. Inclui pet.nome, cliente.nome, pacote.id.
-        """
-        try:
-            target_date = date.fromisoformat(data)
-        except ValueError:
-            target_date = date.today()
+    """
+    Lista agendamentos de data específica (YYYY-MM-DD) para dashboard.
+    Default: hoje se inválida. Inclui pet.nome, cliente.nome, pacote.id.
+    """
+    try:
+        target_date = date.fromisoformat(data)
+    except ValueError:
+        target_date = date.today()
 
-        agendamentos = (db.query(Agendamento)
-            .join(Pacote)
-            .outerjoin(Cachorro)
-            .filter(Agendamento.data_banho == target_date)
-            .order_by(Agendamento.registrado_em.desc())
-            .all()
-        )
+    agendamentos = (db.query(Agendamento)
+        .join(Pacote)
+        .outerjoin(Cachorro)
+        .filter(Agendamento.data_banho == target_date)
+        .order_by(Agendamento.registrado_em.desc())
+        .all()
+    )
 
-        result = []
-        for ag in agendamentos:
-            ag_dict = ag.to_dict()
-            ag_dict["pet_nome"] = ag.pacote.cachorro.nome if ag.pacote and ag.pacote.cachorro else "Pet não encontrado"
-            ag_dict["cliente_nome"] = (ag.pacote.cachorro.cliente.nome if ag.pacote 
+    result = []
+    for ag in agendamentos:
+        ag_dict = {
+            "id": ag.id,
+            "pacote_id": ag.pacote_id,
+            "data_banho": ag.data_banho,
+            "status_presenca": ag.status_presenca,
+            "extras": ag.extras,
+            "registrado_em": ag.registrado_em,
+            "atualizado_em": ag.atualizado_em,
+            "pet_nome": ag.pacote.cachorro.nome if ag.pacote and ag.pacote.cachorro else "Pet não encontrado",
+            "cliente_nome": (ag.pacote.cachorro.cliente.nome if ag.pacote 
                                      and ag.pacote.cachorro 
                                      and ag.pacote.cachorro.cliente 
                                      else "Cliente não encontrado")
-            result.append(ag_dict)
-        
-        return result
+        }
+        result.append(ag_dict)
+    
+    return result
 
 
 @router.put("/{agendamento_id}", response_model=AgendamentoResponse)
@@ -126,4 +133,3 @@ def deletar_agendamento(agendamento_id: int, db: Session = Depends(get_db)):
     db.delete(db_ag)
     db.commit()
     return None
-

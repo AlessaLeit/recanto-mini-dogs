@@ -35,16 +35,7 @@ def listar_pacotes(
 
     pacotes = query.all()
 
-    # Padroniza o retorno usando to_dict() para cada item, 
-    # mantendo a consistência com 'obter_pacote' e 'criar_pacote'.
-    resultado = []
-    for p in pacotes:
-        p_dict = p.to_dict()
-        ags = getattr(p, 'agendamentos', []) or []
-        p_dict['agendamentos'] = [ag.to_dict() for ag in ags]
-        resultado.append(p_dict)
-
-    return resultado
+    return [schemas.PacoteResponse.model_validate(p).model_dump() for p in pacotes]
 
 @router.post("/", response_model=schemas.PacoteResponse, status_code=status.HTTP_201_CREATED)
 def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Session = Depends(get_db)):
@@ -150,14 +141,7 @@ def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Session = Depends(get_d
     # Para o detalhe, a UI usa PacoteDetail.vue que espera agendamentos no payload.
     # Para compatibilidade com a serialização Pydantic, retornamos somente campos escalares + agendamentos.
     # (PacoteResponse.agendamentos é List[Any], então aceitamos dicts).
-    pacote_dict = db_pacote.to_dict()
-    pacotes_agendamentos = getattr(db_pacote, 'agendamentos', None) or []
-    pacote_dict['agendamentos'] = [ag.to_dict() for ag in pacotes_agendamentos]
-
-    return pacote_dict
-
-
-
+    return db_pacote
 
 
 
@@ -174,12 +158,8 @@ def obter_pacote(pacote_id: int, db: Session = Depends(get_db)):
         .first()
     if not pacote:
         raise HTTPException(status_code=404, detail="Pacote não encontrado")
-
-    # Evita erro de serialização do relacionamento Agendamento.
-    pacote_dict = pacote.to_dict()
-    agendamentos = getattr(pacote, 'agendamentos', None) or []
-    pacote_dict['agendamentos'] = [ag.to_dict() for ag in agendamentos]
-    return pacote_dict
+    
+    return schemas.PacoteResponse.model_validate(pacote).model_dump()
 
 
 @router.put("/{pacote_id}", response_model=schemas.PacoteResponse)
@@ -196,11 +176,7 @@ def atualizar_pacote(pacote_id: int, pacote_atualizar: schemas.PacoteUpdate, db:
     db.commit()
     db.refresh(pacote)
 
-    # Padroniza o retorno usando to_dict() para evitar erros de serialização
-    pacote_dict = pacote.to_dict()
-    agendamentos = getattr(pacote, 'agendamentos', None) or []
-    pacote_dict['agendamentos'] = [ag.to_dict() for ag in agendamentos]
-    return pacote_dict
+    return schemas.PacoteResponse.model_validate(pacote).model_dump()
 
 @router.delete("/{pacote_id}", status_code=status.HTTP_204_NO_CONTENT)
 def deletar_pacote(
