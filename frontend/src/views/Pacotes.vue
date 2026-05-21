@@ -24,6 +24,7 @@
       <select v-model="filtroPagamento" class="filter-select">
         <option value="todos">Todos os Status</option>
         <option value="em_aberto">Em Aberto</option>
+        <option value="fechado">Fechado (Aguardando)</option>
         <option value="pago">Pago</option>
       </select>
     </div>
@@ -60,15 +61,33 @@
           </div>
           <div class="form-group">
             <label>Tipo de Plano</label>
-            <select v-model="novoPacote.tipo_plano" required>
+            <select v-model="novoPacote.tipo_plano" @change="calcularSugeridoNovo" required>
               <option value="semanal">Semanal (4 banhos/mês)</option>
               <option value="quinzenal">Quinzenal (2 banhos/mês)</option>
               <option value="mensal">Mensal (1 banho/mês)</option>
             </select>
           </div>
           <div class="form-group">
-            <label>Valor Cobrado (R$)</label>
-            <input v-model.number="novoPacote.valor_cobrado" type="number" step="0.01" required />
+            <label>Dia da Semana</label>
+            <select v-model="novoPacote.dia_da_semana" required>
+              <option value="terca">Terça-feira</option>
+              <option value="quarta">Quarta-feira</option>
+              <option value="quinta">Quinta-feira</option>
+              <option value="sexta">Sexta-feira</option>
+              <option value="sabado">Sábado</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Valor Base do Banho (R$)</label>
+            <input v-model.number="novoPacote.valor_banho_base" type="number" step="0.01" @input="calcularSugeridoNovo" required />
+          </div>
+          <div class="form-group">
+            <label>Transporte Total (R$)</label>
+            <input v-model.number="novoPacote.valor_transporte" type="number" step="0.01" @input="calcularSugeridoNovo" />
+          </div>
+          <div class="form-group">
+            <label>Valor Total Cobrado (R$)</label>
+            <input v-model.number="novoPacote.valor_cobrado" type="number" step="0.01" required style="font-weight: 800; background: var(--dourado-bg);" />
           </div>
           <div class="form-actions">
             <button type="button" @click="showNovoPacote = false" class="btn btn-cancelar">Cancelar</button>
@@ -106,8 +125,20 @@ const pacoteSelecionado = ref(null)
 const filtroStatus = ref('ativos')
 const filtroPagamento = ref('todos')
 
-const cachorroId = computed(() => parseInt(route.query.cachorro_id) || null)
-const novoPacote = ref({ cachorro_id: null, tipo_plano: 'semanal', valor_cobrado: 0 })
+const novoPacote = ref({ 
+  cachorro_id: null, 
+  tipo_plano: 'semanal', 
+  dia_da_semana: 'terca',
+  valor_banho_base: 0, 
+  valor_transporte: 0, 
+  valor_cobrado: 0 
+})
+
+const cachorroId = computed(() => {
+  const id = parseInt(route.query.cachorro_id)
+  if (id && !novoPacote.value.cachorro_id) novoPacote.value.cachorro_id = id
+  return id || null
+})
 
 const cachorros = computed(() => {
   const lista = []
@@ -125,6 +156,14 @@ const pacotesFiltrados = computed(() => {
   return lista
 })
 
+function calcularSugeridoNovo() {
+  const qtd = novoPacote.value.tipo_plano === 'semanal' ? 4 : (novoPacote.value.tipo_plano === 'quinzenal' ? 2 : 1)
+  const base = novoPacote.value.valor_banho_base || 0
+  const transporte = novoPacote.value.valor_transporte || 0
+  
+  novoPacote.value.valor_cobrado = (base * qtd) + transporte
+}
+
 function voltarTodosPacotes() { router.push('/pacotes') }
 function abrirPagamento(pacote) { pacoteSelecionado.value = pacote; showPagamento.value = true }
 async function confirmarPagamento(dados) {
@@ -135,11 +174,16 @@ async function confirmarPagamento(dados) {
   } catch (err) { alert('Erro: ' + err) }
 }
 async function criarPacote() {
+  if (novoPacote.value.valor_cobrado <= 0 || novoPacote.value.valor_banho_base <= 0) {
+    alert('O valor do banho e o valor total devem ser maiores que zero.')
+    return
+  }
+
   try {
     await pacotesStore.criarPacote(novoPacote.value)
     showNovoPacote.value = false
-    novoPacote.value = { cachorro_id: null, tipo_plano: 'semanal', valor_cobrado: 0 }
-    alert('Pacote criado com sucesso!')
+    // Resetar formulário
+    novoPacote.value = { cachorro_id: null, tipo_plano: 'semanal', dia_da_semana: 'terca', valor_banho_base: 0, valor_transporte: 0, valor_cobrado: 0 }
   } catch (err) { alert('Erro ao criar pacote: ' + err) }
 }
 function verDetalhes(pacote) { router.push(`/pacotes/${pacote.id}`) }

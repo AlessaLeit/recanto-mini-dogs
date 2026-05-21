@@ -17,6 +17,8 @@ export const pacoteApi = {
       params: { valor_pago, data_pagamento }
     }),
 
+  fechar: (id) => api.patch(`/pacotes/${id}/fechar`),
+
   // Agendamentos 
   listarAgendamentosPacote: (pacoteId) => api.get(`/pacotes/${pacoteId}/agendamentos`),
   

@@ -45,11 +45,11 @@ class PacoteCreate(BaseModel):
     cachorro_id: int = Field(..., gt=0)
     tipo_plano: TipoPlano
 
-    # Novo: usado para gerar automaticamente agendamentos
     dia_da_semana: Optional[DiaSemana] = None
 
     valor_banho_base: float = Field(gt=0)
     valor_cobrado: float = Field(gt=0)
+    valor_transporte: Optional[float] = 0.0
     limite_banhos_mes: Optional[int] = None
     ativo: bool = True
 
@@ -59,6 +59,8 @@ class PacoteUpdate(BaseModel):
     dia_da_semana: Optional[DiaSemana] = None
 
     valor_cobrado: Optional[float] = None
+    valor_banho_base: Optional[float] = None
+    valor_transporte: Optional[float] = None
     limite_banhos_mes: Optional[int] = None
     ativo: Optional[bool] = None
 
@@ -75,6 +77,7 @@ class PacoteResponse(BaseModel):
 
     valor_banho_base: float
     valor_cobrado: float
+    valor_transporte: float = 0.0
     valor_pago: Optional[float] = None
     data_pagamento: Optional[date] = None
     ativo: bool

@@ -102,14 +102,12 @@
       <div v-else class="empty-state">
         Nenhum agendamento encontrado.
       </div>
-
+    </div>
       <!-- Seção de Exclusão: Movida para o final do card de agendamentos -->
       <div class="footer-danger-zone">
-        <span class="danger-text">Deseja encerrar este pacote permanentemente?</span>
         <button @click="confirmarDeletarPacote" class="btn btn-perigo" title="Excluir este pacote">🗑️ Excluir Pacote</button>
+        <button v-if="pacote?.status_pagamento === 'em_aberto'" @click="fecharPacote" class="btn btn-ghost" style="border-color: var(--dourado); color: var(--marrom);">🔒 Fechar Pacote</button>
       </div>
-    </div>
-
     <!-- ── MODAL: Editar Data ── -->
     <div class="modal" v-if="showEditData">
       <div class="modal-overlay" @click="showEditData = false"></div>
@@ -158,7 +156,7 @@
         <div class="grid-form">
           <div class="form-group">
             <label>Tipo de Plano</label>
-            <select v-model="formPacote.tipo_plano" @change="recalcularSugerido">
+            <select v-model="formPacote.tipo_plano" @change="handleInputMudanca">
               <option value="semanal">Semanal (4 banhos)</option>
               <option value="quinzenal">Quinzenal (2 banhos)</option>
               <option value="mensal">Mensal (1 banho)</option>
@@ -179,11 +177,11 @@
         <div class="grid-form">
           <div class="form-group">
             <label>Valor Base Banho (R$)</label>
-            <input type="number" step="0.01" v-model.number="formPacote.valor_banho_base" @input="recalcularSugerido" />
+            <input type="number" step="0.01" v-model.number="formPacote.valor_banho_base" @input="handleInputMudanca" />
           </div>
           <div class="form-group">
             <label>Transporte Total (R$)</label>
-            <input type="number" step="0.01" v-model.number="formPacote.valor_transporte" />
+            <input type="number" step="0.01" v-model.number="formPacote.valor_transporte" @input="handleInputMudanca" />
           </div>
         </div>
 
@@ -361,6 +359,15 @@ async function salvarNovaData() {
   } catch (err) {}
 }
 
+async function fecharPacote() {
+  if (!confirm('Deseja fechar este pacote? Isso indica que todos os banhos foram realizados e o acerto financeiro deve ser feito.')) return
+  try {
+    await pacotesStore.fecharPacote(pacoteId.value)
+    await carregarPacote()
+    alert('Pacote fechado com sucesso! Agora você pode registrar o pagamento.')
+  } catch (err) { alert('Erro ao fechar pacote: ' + err) }
+}
+
 function abrirEditarPacote() {
   formPacote.value = {
     tipo_plano: pacote.value.tipo_plano,
@@ -369,14 +376,27 @@ function abrirEditarPacote() {
     valor_cobrado: pacote.value.valor_cobrado,
     valor_transporte: pacote.value.valor_transporte || 0
   }
-  recalcularSugerido()
-  sugestaoVisivel.value = false
+  
+  // Define o valor sugerido apenas como referência inicial sem alterar o valor_cobrado salvo
+  const qtd = formPacote.value.tipo_plano === 'semanal' ? 4 : (formPacote.value.tipo_plano === 'quinzenal' ? 2 : 1)
+  valorSugerido.value = (formPacote.value.valor_banho_base * qtd) + formPacote.value.valor_transporte
+  sugestaoVisivel.value = true
   showModalEditPacote.value = true
 }
 
+function handleInputMudanca() {
+  recalcularSugerido()
+}
+
 function recalcularSugerido() {
-  const qtd = formPacote.value.tipo_plano === 'semanal' ? 4 : formPacote.value.tipo_plano === 'quinzenal' ? 2 : 1
-  valorSugerido.value = (formPacote.value.valor_banho_base || 0) * qtd
+  const qtd = formPacote.value.tipo_plano === 'semanal' ? 4 : (formPacote.value.tipo_plano === 'quinzenal' ? 2 : 1)
+  const valorBase = formPacote.value.valor_banho_base || 0
+  const transporte = formPacote.value.valor_transporte || 0
+  
+  // Recalcula o sugerido: (Quantidade de banhos do plano * valor base) + Transporte total
+  valorSugerido.value = (valorBase * qtd) + transporte
+  
+  // Atualiza o valor final que será gravado no pacote
   formPacote.value.valor_cobrado = valorSugerido.value
   sugestaoVisivel.value = true
 }
@@ -515,6 +535,7 @@ onMounted(carregarPacote)
 .status-pill.em_aberto { background: var(--dourado-claro); color: #6b4c00; }
 .status-pill.pago      { background: var(--verde-bg);      color: var(--verde); }
 .status-pill.parcial   { background: #fef0e0;              color: #8b5e00; }
+.status-pill.fechado   { background: #e0e0e0;              color: #424242; }
 
 /* ── INFO CARDS ── */
 .info-cards {

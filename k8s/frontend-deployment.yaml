@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: alessaleit/pacotesbanho-frontend:latest
+        image: alessaleit/pacotesbanho-frontend:1.0.1
         imagePullPolicy: Never
         ports:
         - containerPort: 80

@@ -60,6 +60,9 @@ class Pacote(Base):
         nullable=False,
     )
 
+    # Indica se o ciclo de banhos do mês foi encerrado manualmente
+    fechado: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
 
 
     
@@ -109,9 +112,11 @@ class Pacote(Base):
     def status_pagamento(self) -> str:
         """Retorna o status do pagamento do pacote"""
         if self.valor_pago is None:
-            return "em_aberto"
+            return "fechado" if self.fechado else "em_aberto"
+
         if self.valor_pago >= self.valor_cobrado:
             return "pago"
+
         return "parcial"
     
     @property
@@ -141,6 +146,7 @@ class Pacote(Base):
             "valor_cobrado": self.valor_cobrado,
             "valor_transporte": self.valor_transporte,
             "valor_pago": self.valor_pago,
+            "fechado": self.fechado,
             "data_pagamento": self.data_pagamento.isoformat() if self.data_pagamento else None,
             "ativo": self.ativo,
             "criado_em": self.criado_em.isoformat() if self.criado_em else None,

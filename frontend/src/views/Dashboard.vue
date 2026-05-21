@@ -58,7 +58,12 @@
             </span>
           </div>
           <div class="ag-details">
-            <p>Pacote #{{ ag.pacote_id }} | {{ formatarData(ag.data_banho) }}</p>
+            <p>
+              <span class="link-pacote" @click="verDetalhes({ id: ag.pacote_id })" title="Clique para ver detalhes do pacote">
+                Pacote #{{ ag.pacote_id }}
+              </span>
+              | {{ formatarData(ag.data_banho) }}
+            </p>
             <div v-if="ag.extras && Object.keys(ag.extras).length" class="extras">
               <strong>Extras:</strong> {{ Object.entries(ag.extras).map(([k,v]) => `${k}: ${v}`).join(', ') }}
             </div>
@@ -80,6 +85,7 @@
           :key="pacote.id"
           :pacote="pacote"
           @pagar="abrirPagamento"
+          @detalhes="verDetalhes"
         />
       </div>
     </div>
@@ -119,6 +125,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useClientesStore } from '../stores/clientes'
 import { usePacotesStore } from '../stores/pacotes'
 import PacoteCard from '../components/PacoteCard.vue'
@@ -130,6 +137,8 @@ import { useAgendamentosStore } from '../stores/agendamentos.js'
 const clientesStore = useClientesStore()
 const pacotesStore = usePacotesStore()
 const agendamentosStore = useAgendamentosStore()
+const router = useRouter()
+
 const dataSelecionada = ref(new Date().toISOString().split('T')[0])
 const showModalEdit = ref(false)
 const agEdit = ref(null)
@@ -140,7 +149,7 @@ const totalCachorros = computed(() =>
   clientesStore.clientes.reduce((sum, c) => sum + (c.cachorros?.length || 0), 0)
 )
 const pacotesEmAberto = computed(() =>
-  pacotesStore.pacotes.filter(p => p.status_pagamento === 'em_aberto')
+  pacotesStore.pacotes.filter(p => p.ativo && (p.status_pagamento === 'em_aberto' || p.status_pagamento === 'fechado'))
 )
 const banhosRecentes = computed(() => {
   const banhos = []
@@ -156,6 +165,9 @@ function formatarValor(valor) {
 function abrirPagamento(pacote) {
   pacoteSelecionado.value = pacote
   showPagamento.value = true
+}
+function verDetalhes(pacote) {
+  router.push(`/pacotes/${pacote.id}`)
 }
 async function confirmarPagamento(dados) {
   try {
@@ -332,6 +344,14 @@ onMounted(async () => {
 .ag-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; }
 .ag-pet { font-size: 1rem; font-weight: 800; color: var(--marrom); margin: 0; }
 .ag-cliente { color: var(--text-muted); font-size: 0.85rem; margin: 2px 0 0; }
+.link-pacote {
+  color: var(--marrom-claro);
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.link-pacote:hover { color: var(--dourado); }
 .ag-details { font-size: 0.85rem; color: var(--text-muted); }
 
 .status-badge {

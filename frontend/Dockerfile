@@ -9,7 +9,7 @@ COPY . .
 RUN npm run build
 
 # Estágio de Produção
-FROM nginx:stable-alpine as production-stage
+FROM nginx:stable-alpine AS production-stage
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build-stage /app/dist /usr/share/nginx/html
 EXPOSE 80
