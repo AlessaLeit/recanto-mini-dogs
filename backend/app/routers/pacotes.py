@@ -1,209 +1,247 @@
 """
-Router Pacotes - CRUD, pagamento, geração automática agendamentos e listagem.
+Router Pacotes - CRUD, pagamento, geração automática agend
 """
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
-from typing import List, Optional
-from datetime import date, timedelta, datetime
+from typing import List, Any, Optional
+
 from app.database import get_db
-from app.models import Pacote, Cachorro, Agendamento
-from app.schemas import PacoteCreate, PacoteUpdate, PacoteResponse, PacoteWithBanhos
-from app.services.pacote_service import PacoteService  # Import serviço
+from app import models, schemas
+from app.services.pacote_service import PacoteService
+from app.auth import get_current_user
 
-router = APIRouter(redirect_slashes=True)
+router = APIRouter(
+    tags=["Pacotes"],
+    redirect_slashes=True,
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Pacote não encontrado"}},
+    dependencies=[Depends(get_current_user)]
+)
 
+@router.get("/", response_model=List[schemas.PacoteResponse])
+def listar_pacotes(
+    incluir_inativos: bool = Query(False, description="Incluir pacotes inativos?"),
+    db: Session = Depends(get_db)
+):
+    """Lista pacotes (ativos por padrão; usa incluir_inativos=true para todos)."""
+    query = db.query(models.Pacote).options(
+        joinedload(models.Pacote.cachorro).joinedload(models.Cachorro.cliente),
+        joinedload(models.Pacote.agendamentos)  # Garante que os agendamentos sejam carregados
+    ).order_by(models.Pacote.criado_em.desc())
 
-@router.post("/", response_model=PacoteResponse, status_code=status.HTTP_201_CREATED)
-def criar_pacote(pacote: PacoteCreate, db: Session = Depends(get_db)):
-    """
-    Cria um novo pacote de banhos para um cachorro.
-    GERA AUTOMATICAMENTE agendamentos baseado no tipo_plano.
-    """
-    # Verifica se cachorro existe
-    cachorro = db.query(Cachorro).filter(Cachorro.id == pacote.cachorro_id).first()
+    if not incluir_inativos:
+        # Usamos filter(or_...) caso existam registros legados com 'ativo' como NULL
+        from sqlalchemy import or_
+        query = query.filter(or_(models.Pacote.ativo == True, models.Pacote.ativo == None))
+
+    pacotes = query.all()
+
+    return [schemas.PacoteResponse.model_validate(p).model_dump() for p in pacotes]
+
+@router.post("/", response_model=schemas.PacoteResponse, status_code=status.HTTP_201_CREATED)
+def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Session = Depends(get_db)):
+    """Cria um novo pacote para um cachorro específico."""
+    # Verifica se o cachorro existe e é ativo
+    cachorro = db.query(models.Cachorro).filter(
+        models.Cachorro.id == pacote_criar.cachorro_id,
+        models.Cachorro.ativo == True
+    ).first()
     if not cachorro:
-        raise HTTPException(status_code=404, detail="Cachorro não encontrado")
+        raise HTTPException(status_code=404, detail="Cachorro não encontrado ou inativo")
     
-    db_pacote = Pacote(**pacote.model_dump(exclude={'limite_banhos_mes'}))
+    # Cria o pacote
+    dados_pacote = pacote_criar.model_dump()
+    dados_pacote.pop('limite_banhos_mes', None)
+    dados_pacote.pop('status_pagamento', None)
+    
+    # Garante que o pacote seja criado como ativo explicitamente
+    if 'ativo' not in dados_pacote:
+        dados_pacote['ativo'] = True
+
+    db_pacote = models.Pacote(**dados_pacote)
     db.add(db_pacote)
     db.commit()
     db.refresh(db_pacote)
-    
-    # ✅ PASSO 1: Gerar agendamentos automáticos
-    service = PacoteService(db)
-    start_date = db_pacote.criado_em.date()
-    meses = 3  # Gerar para 3 meses à frente
-    
-    limites = {
-        "semanal": 4,
-        "quinzenal": 2,
-        "mensal": 1
+
+    # ==============================================================
+    # Geração automática de agendamentos para o mês atual.
+    # Regra:
+    # - Semanal: 4 datas no mesmo dia da semana (dia_da_semana)
+    # - Quinzenal: 2 datas com intervalo de 15 dias a partir da 1ª ocorrência no mês
+    # - Mensal: 1 data (primeira ocorrência no mês)
+    # ==============================================================
+    from datetime import date, timedelta
+    import calendar
+
+
+    hoje = date.today()
+    primeiro_dia_mes = date(hoje.year, hoje.month, 1)
+    ultimo_dia_mes = date(hoje.year, hoje.month, calendar.monthrange(hoje.year, hoje.month)[1])
+
+    mapa_dow = {
+        "terca": 1,   # Segunda=0
+        "quarta": 2,
+        "quinta": 3,
+        "sexta": 4,
+        "sabado": 5,
     }
-    num_por_mes = limites.get(db_pacote.tipo_plano.value, 1)
-    
-    current_date = start_date
-    for mes in range(meses):
-        mes_start = (start_date.replace(day=1) + timedelta(days=30*mes))
-        generated = 0
-        
-        while generated < num_por_mes:
-            candidate_date = None
-            
-            if db_pacote.tipo_plano.value == "semanal":
-                # Segunda e Quinta da semana (ajustar para ~4/mês)
-                weekday = mes_start.weekday()
-                candidate_date = mes_start + timedelta(days=(0 if weekday <=1 else 4-weekday) + generated*3)
-            elif db_pacote.tipo_plano.value == "quinzenal":
-                candidate_date = mes_start.replace(day=1 if generated==0 else 15)
-            else:  # mensal
-                candidate_date = mes_start.replace(day=1)
-            
-            if candidate_date and candidate_date.month == mes_start.month:
-                # Validar único e limite
-                if db.query(Agendamento).filter(
-                    Agendamento.pacote_id == db_pacote.id,
-                    Agendamento.data_banho == candidate_date
-                ).first():
-                    continue  # Já existe, pular
-                
-                try:
-                    service.validar_limite_agendamentos(db_pacote.id, candidate_date)
-                    # Criar
-                    db_ag = Agendamento(
-                        pacote_id=db_pacote.id,
-                        data_banho=candidate_date,
-                        status_presenca="pendente",
-                        extras={}
-                    )
-                    db.add(db_ag)
-                    generated += 1
-                except HTTPException:
-                    break  # Limite atingido
-        
-        current_date = mes_start + timedelta(days=30)
-    
-    db.commit()
-    
-    return db_pacote.to_dict()
 
+    alvo_dow = mapa_dow.get(db_pacote.dia_da_semana.value)
+    if alvo_dow is None:
+        raise HTTPException(status_code=400, detail="Dia da semana inválido")
 
-@router.get("/{pacote_id}/agendamentos", response_model=List[dict])
-def listar_agendamentos_pacote(pacote_id: int, db: Session = Depends(get_db)):
-    """
-    Lista TODOS agendamentos do pacote ordenados por data_banho.
-    Inclui valor_banho (do pet) e total_dia computado.
-    """
-    pacote = db.query(Pacote).options(
-        joinedload(Pacote.cachorro),
-        joinedload(Pacote.agendamentos)
-    ).filter(Pacote.id == pacote_id).first()
-    
-    if not pacote:
-        raise HTTPException(status_code=404, detail="Pacote não encontrado")
-    
-    agendamentos = []
-    valor_banho_base = pacote.cachorro.valor_banho or 0
-    
-    for ag in pacote.agendamentos:
-        extras_total = sum(float(e.get('preco', 0)) for e in (ag.extras or {}).values())
-        total_dia = valor_banho_base + extras_total
-        
-        agendamentos.append({
-            **ag.to_dict(),
-            "valor_banho": valor_banho_base,
-            "total_dia": total_dia
-        })
-    
-    return sorted(agendamentos, key=lambda x: x['data_banho'])
+    def primeira_ocorrencia_no_mes() -> Optional[date]:
+        d = primeiro_dia_mes
+        while d <= ultimo_dia_mes:
+            if d.weekday() == alvo_dow:
+                return d
+            d += timedelta(days=1)
+        return None
 
+    primeira = primeira_ocorrencia_no_mes()
+    datas: List[date] = []
 
-@router.get("/", response_model=List[PacoteResponse])
-def listar_pacotes(
-    cachorro_id: Optional[int] = Query(None, description="Filtrar por cachorro"),
-    ativo: Optional[bool] = Query(True, description="Filtrar por status ativo"),
-    incluir_inativos: bool = Query(False, description="Incluir pacotes inativos"),
-    db: Session = Depends(get_db)
-):
-    """
-    Lista pacotes com filtros.
-    Por padrão retorna apenas ativos, a menos que incluir_inativos=true.
-    """
-    service = PacoteService(db)
-    
-    if cachorro_id:
-        pacotes = service.listar_pacotes_ativos_por_cachorro(cachorro_id, incluir_inativos)
-        return [p.to_dict() for p in pacotes]
-    
-    query = db.query(Pacote).options(joinedload(Pacote.cachorro))
-    if not incluir_inativos:
-        query = query.filter(Pacote.ativo == True)
-    
-    pacotes = query.all()
-    return [p.to_dict() for p in pacotes]
+    if db_pacote.tipo_plano.value == "semanal" and primeira:
+        datas = [primeira + timedelta(days=7 * i) for i in range(4)]
+    elif db_pacote.tipo_plano.value == "quinzenal" and primeira:
+        datas = [primeira + timedelta(days=15 * i) for i in range(2)]
+    elif db_pacote.tipo_plano.value == "mensal" and primeira:
+        datas = [primeira]
 
+    # Garante que todas datas estão dentro do mês (caso 'primeira' caia no fim do mês)
+    datas_validas = [d for d in datas if primeiro_dia_mes <= d <= ultimo_dia_mes]
 
-@router.get("/{pacote_id}", response_model=PacoteWithBanhos)
-def obter_pacote(pacote_id: int, db: Session = Depends(get_db)):
-    """
-    Obtém detalhes do pacote incluindo banhos realizados.
-    """
-    service = PacoteService(db)
-    pacote = service.get_pacote_com_relacionamentos(pacote_id)
-    
-    if not pacote:
-        raise HTTPException(status_code=404, detail="Pacote não encontrado")
-    
-    # Adiciona contagem total de banhos
-    pacote.total_banhos_realizados = len(pacote.banhos)
-    return pacote.to_dict()
+    # Import aqui para evitar dependência circular no carregamento.
+    from app.models import Agendamento
 
+    for d in datas_validas:
+        db_ag = Agendamento(
 
-@router.put("/{pacote_id}", response_model=PacoteResponse)
-def atualizar_pacote(
-    pacote_id: int,
-    pacote_update: PacoteUpdate,
-    db: Session = Depends(get_db)
-):
-    """
-    Atualiza dados do pacote (plano, valores, status).
-    """
-    db_pacote = db.query(Pacote).filter(Pacote.id == pacote_id).first()
-    if not db_pacote:
-        raise HTTPException(status_code=404, detail="Pacote não encontrado")
-    
-    update_data = pacote_update.model_dump(exclude_unset=True, exclude={'limite_banhos_mes'})
-    for field, value in update_data.items():
-        setattr(db_pacote, field, value)
-    
+            pacote_id=db_pacote.id,
+            data_banho=d,
+            status_presenca="pendente",
+            extras={},
+        )
+        db.add(db_ag)
+
     db.commit()
     db.refresh(db_pacote)
+
+    # Retorna pacote com agendamentos carregados (para a resposta do endpoint)
+    db_pacote = (
+
+        db.query(models.Pacote)
+        .options(joinedload(models.Pacote.agendamentos))
+        .filter(models.Pacote.id == db_pacote.id)
+        .first()
+    )
+
+    # Em alguns cenários o FastAPI/Pydantic não consegue serializar diretamente o
+    # modelo SQLAlchemy quando há tipos não-mapeados (ex.: relacionamento Agendamento).
+    # Então, retornamos explicitamente via dict compatível com PacoteResponse.
+    # Para o detalhe, a UI usa PacoteDetail.vue que espera agendamentos no payload.
+    # Para compatibilidade com a serialização Pydantic, retornamos somente campos escalares + agendamentos.
+    # (PacoteResponse.agendamentos é List[Any], então aceitamos dicts).
     return db_pacote
 
 
-@router.post("/{pacote_id}/pagar", response_model=PacoteResponse)
-def registrar_pagamento(
-    pacote_id: int,
-    valor_pago: float,
-    data_pagamento: date,
+
+@router.get("/{pacote_id}", response_model=schemas.PacoteResponse)
+
+def obter_pacote(pacote_id: int, db: Session = Depends(get_db)):
+    """Obtém detalhes de um pacote específico com agendamentos."""
+    pacote = db.query(models.Pacote)\
+        .options(
+            joinedload(models.Pacote.cachorro).joinedload(models.Cachorro.cliente),
+            joinedload(models.Pacote.agendamentos)
+        )\
+        .filter(models.Pacote.id == pacote_id)\
+        .first()
+    if not pacote:
+        raise HTTPException(status_code=404, detail="Pacote não encontrado")
+    
+    return schemas.PacoteResponse.model_validate(pacote).model_dump()
+
+
+@router.put("/{pacote_id}", response_model=schemas.PacoteResponse)
+def atualizar_pacote(pacote_id: int, pacote_atualizar: schemas.PacoteUpdate, db: Session = Depends(get_db)):
+    """Atualiza dados do pacote."""
+    pacote = db.query(models.Pacote).filter(models.Pacote.id == pacote_id).first()
+    if not pacote:
+        raise HTTPException(status_code=404, detail="Pacote não encontrado")
+    
+    update_data = pacote_atualizar.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(pacote, field, value)
+    
+    db.commit()
+    db.refresh(pacote)
+
+    return schemas.PacoteResponse.model_validate(pacote).model_dump()
+
+@router.delete("/{pacote_id}", status_code=status.HTTP_204_NO_CONTENT)
+def deletar_pacote(
+    pacote_id: int, 
+    force: bool = Query(False, description="Se True, remove permanentemente do banco"),
     db: Session = Depends(get_db)
 ):
     """
-    Endpoint específico para registrar pagamento de um pacote.
+    Remove pacote. 
+    Por padrão realiza soft-delete (ativo=False) e remove agendamentos pendentes da agenda.
+    Use force=true para remoção física completa do banco de dados.
     """
-    service = PacoteService(db)
-    return service.registrar_pagamento(pacote_id, valor_pago, data_pagamento)
-
-
-@router.delete("/{pacote_id}", status_code=status.HTTP_204_NO_CONTENT)
-def deletar_pacote(pacote_id: int, db: Session = Depends(get_db)):
-    """
-    Remove um pacote e todos os seus banhos.
-    """
-    db_pacote = db.query(Pacote).filter(Pacote.id == pacote_id).first()
-    if not db_pacote:
+    pacote = db.query(models.Pacote).filter(models.Pacote.id == pacote_id).first()
+    if not pacote:
         raise HTTPException(status_code=404, detail="Pacote não encontrado")
-    
-    db.delete(db_pacote)
+
+    if force:
+        db.delete(pacote)
+    else:
+        pacote.ativo = False
+        # Ao desativar, limpamos agendamentos futuros que ainda não foram realizados
+        db.query(models.Agendamento).filter(
+            models.Agendamento.pacote_id == pacote_id,
+            models.Agendamento.status_presenca == "pendente"
+        ).delete(synchronize_session=False)
+
     db.commit()
     return None
 
+@router.patch("/{pacote_id}/pagar", response_model=dict)
+def registrar_pagamento(
+    pacote_id: int,
+    valor_pago: float,
+    data_pagamento: str,  # YYYY-MM-DD
+    db: Session = Depends(get_db)
+):
+    """Registra pagamento de um pacote usando o serviço."""
+    service = PacoteService(db)
+    from datetime import date
+    data = date.fromisoformat(data_pagamento)
+    result = service.registrar_pagamento(pacote_id, valor_pago, data)
+    return result
+
+@router.get("/{pacote_id}/agendamentos", response_model=List[schemas.AgendamentoResponse])
+def listar_agendamentos_pacote(pacote_id: int, db: Session = Depends(get_db)):
+    """Lista agendamentos vinculados a um pacote específico."""
+    agendamentos = db.query(models.Agendamento).filter(
+        models.Agendamento.pacote_id == pacote_id
+    ).order_by(models.Agendamento.data_banho).all()
+    return agendamentos
+
+@router.post("/{pacote_id}/agendamento-extra", response_model=schemas.AgendamentoResponse)
+def adicionar_agendamento_extra(
+    pacote_id: int, 
+    data_banho: str, 
+    db: Session = Depends(get_db)
+):
+    """Cria um agendamento extra sem validar o limite do plano."""
+    from datetime import date
+    db_ag = models.Agendamento(
+        pacote_id=pacote_id,
+        data_banho=date.fromisoformat(data_banho),
+        status_presenca="pendente"
+    )
+    db.add(db_ag)
+    db.commit()
+    db.refresh(db_ag)
+    return db_ag
