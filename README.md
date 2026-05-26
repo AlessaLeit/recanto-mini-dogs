@@ -1,4 +1,4 @@
-# Canil Recanto Mini Dogs — Sistema de Gestão de Banho & Tosa
+# Sistema de Gestão de Banho & Tosa
 
 Sistema completo para gerenciamento de pacotes mensais de banho e tosa, controle de clientes/pets, agendamentos e relatórios financeiros.
 
