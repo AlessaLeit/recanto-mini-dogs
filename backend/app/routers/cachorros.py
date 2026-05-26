@@ -8,7 +8,7 @@ from app.database import get_db
 from app.models import Cachorro, Cliente
 from app.schemas import CachorroCreate, CachorroUpdate, CachorroResponse, CachorroWithPacotes
 
-router = APIRouter(redirect_slashes=True)
+router = APIRouter(tags=["Cachorros"], redirect_slashes=True)
 
 
 @router.post("/", response_model=CachorroResponse, status_code=status.HTTP_201_CREATED)
@@ -25,7 +25,7 @@ def criar_cachorro(cachorro: CachorroCreate, db: Session = Depends(get_db)):
     db.add(db_cachorro)
     db.commit()
     db.refresh(db_cachorro)
-    return db_cachorro
+    return CachorroResponse.model_validate(db_cachorro).model_dump()
 
 
 @router.get("/", response_model=List[CachorroResponse])
@@ -46,7 +46,8 @@ def listar_cachorros(
     if porte:
         query = query.filter(Cachorro.porte == porte)
     
-    return query.offset(skip).limit(limit).all()
+    cachorros = query.offset(skip).limit(limit).all()
+    return [CachorroResponse.model_validate(c).model_dump() for c in cachorros]
 
 
 @router.get("/{cachorro_id}", response_model=CachorroWithPacotes)
@@ -61,7 +62,7 @@ def obter_cachorro(cachorro_id: int, db: Session = Depends(get_db)):
     if not cachorro:
         raise HTTPException(status_code=404, detail="Cachorro não encontrado")
     
-    return cachorro
+    return CachorroWithPacotes.model_validate(cachorro).model_dump()
 
 
 @router.put("/{cachorro_id}", response_model=CachorroResponse)
@@ -83,7 +84,7 @@ def atualizar_cachorro(
     
     db.commit()
     db.refresh(db_cachorro)
-    return db_cachorro
+    return CachorroResponse.model_validate(db_cachorro).model_dump()
 
 
 @router.delete("/{cachorro_id}", status_code=status.HTTP_204_NO_CONTENT)

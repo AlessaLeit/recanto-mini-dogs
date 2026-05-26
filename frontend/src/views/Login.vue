@@ -84,16 +84,16 @@ async function handleSubmit() {
   --radius:        12px;
   --shadow:        0 8px 32px rgba(59,42,26,0.18);
 
-  min-height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
-
-  /* Fundo com padrão de patinhas sutil */
   background-color: var(--marrom);
-  background-image:
-    radial-gradient(circle at 20% 20%, rgba(212,168,67,0.12) 0%, transparent 50%),
-    radial-gradient(circle at 80% 80%, rgba(107,143,78,0.1) 0%, transparent 50%);
 }
 
 /* ── CARD ── */

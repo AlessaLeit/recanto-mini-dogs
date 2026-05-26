@@ -8,6 +8,7 @@ import Pacotes from '../views/Pacotes.vue'
 import Clientes from '../views/Clientes.vue'
 import Relatorios from '../views/Relatorios.vue'
 import Login from '../views/Login.vue'
+import PacoteDetail from '../views/PacoteDetail.vue'
 import { useAuthStore } from '../stores/auth'
 
 const routes = [
@@ -40,7 +41,7 @@ const routes = [
   {
     path: '/pacotes/:id',
     name: 'PacoteDetail',
-    component: () => import('../views/PacoteDetail.vue')
+    component: PacoteDetail
   }
 ]
 

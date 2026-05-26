@@ -26,7 +26,7 @@ def criar_agendamento(agendamento: AgendamentoCreate, db: Session = Depends(get_
     db.add(db_ag)
     db.commit()
     db.refresh(db_ag)
-    return db_ag
+    return AgendamentoResponse.model_validate(db_ag).model_dump()
 
 @router.get("/", response_model=List[AgendamentoResponse])
 def listar_agendamentos(pacote_id: int, db: Session = Depends(get_db)):
@@ -97,7 +97,7 @@ def atualizar_agendamento(
     
     db.commit()
     db.refresh(db_ag)
-    return db_ag
+    return AgendamentoResponse.model_validate(db_ag).model_dump()
 
 
 @router.put("/{agendamento_id}/data", response_model=AgendamentoResponse)
@@ -118,7 +118,7 @@ def atualizar_data_agendamento(
     
     db.commit()
     db.refresh(db_ag)
-    return db_ag
+    return AgendamentoResponse.model_validate(db_ag).model_dump()
 
 
 @router.delete("/{agendamento_id}", status_code=status.HTTP_204_NO_CONTENT)

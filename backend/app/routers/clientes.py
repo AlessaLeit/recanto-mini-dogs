@@ -8,7 +8,7 @@ from app.database import get_db
 from app.models import Cliente, Cachorro
 from app.schemas import ClienteCreate, ClienteUpdate, ClienteResponse, ClienteWithCachorros
 
-router = APIRouter(redirect_slashes=True)
+router = APIRouter(tags=["Clientes"], redirect_slashes=True)
 
 
 @router.post("/", response_model=ClienteResponse, status_code=status.HTTP_201_CREATED)
@@ -20,7 +20,7 @@ def criar_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
     db.add(db_cliente)
     db.commit()
     db.refresh(db_cliente)
-    
+    return ClienteResponse.model_validate(db_cliente).model_dump()
 
 @router.get("/", response_model=List[ClienteWithCachorros])
 def listar_clientes(
@@ -40,7 +40,7 @@ def listar_clientes(
         query = query.filter(Cliente.nome.ilike(f"%{busca}%"))
     
     clientes = query.offset(skip).limit(limit).all()
-    return clientes
+    return [ClienteWithCachorros.model_validate(c).model_dump() for c in clientes]
 
 @router.get("/{cliente_id}", response_model=ClienteWithCachorros)
 def obter_cliente(cliente_id: int, db: Session = Depends(get_db)):
@@ -54,7 +54,7 @@ def obter_cliente(cliente_id: int, db: Session = Depends(get_db)):
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente não encontrado")
     
-    return cliente
+    return ClienteWithCachorros.model_validate(cliente).model_dump()
 
 
 @router.put("/{cliente_id}", response_model=ClienteResponse)
@@ -77,7 +77,7 @@ def atualizar_cliente(
     
     db.commit()
     db.refresh(db_cliente)
-    return db_cliente
+    return ClienteResponse.model_validate(db_cliente).model_dump()
 
 @router.delete("/{cliente_id}", status_code=status.HTTP_204_NO_CONTENT)
 def deletar_cliente(cliente_id: int, db: Session = Depends(get_db)):

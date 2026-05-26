@@ -53,6 +53,14 @@ def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Session = Depends(get_d
     dados_pacote.pop('limite_banhos_mes', None)
     dados_pacote.pop('status_pagamento', None)
     
+    # Garante que o dia da semana não seja nulo (correção IntegrityError)
+    if not dados_pacote.get('dia_da_semana'):
+        dados_pacote['dia_da_semana'] = pacote_criar.dia_da_semana or "terca"
+
+    # Garante valor padrão para campos novos caso não venham no schema
+    if 'fechado' not in dados_pacote:
+        dados_pacote['fechado'] = False
+
     # Garante que o pacote seja criado como ativo explicitamente
     if 'ativo' not in dados_pacote:
         dados_pacote['ativo'] = True
@@ -128,9 +136,11 @@ def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Session = Depends(get_d
 
     # Retorna pacote com agendamentos carregados (para a resposta do endpoint)
     db_pacote = (
-
         db.query(models.Pacote)
-        .options(joinedload(models.Pacote.agendamentos))
+        .options(
+            joinedload(models.Pacote.agendamentos),
+            joinedload(models.Pacote.cachorro).joinedload(models.Cachorro.cliente)
+        )
         .filter(models.Pacote.id == db_pacote.id)
         .first()
     )
@@ -141,7 +151,7 @@ def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Session = Depends(get_d
     # Para o detalhe, a UI usa PacoteDetail.vue que espera agendamentos no payload.
     # Para compatibilidade com a serialização Pydantic, retornamos somente campos escalares + agendamentos.
     # (PacoteResponse.agendamentos é List[Any], então aceitamos dicts).
-    return db_pacote
+    return schemas.PacoteResponse.model_validate(db_pacote).model_dump()
 
 
 
@@ -176,6 +186,22 @@ def atualizar_pacote(pacote_id: int, pacote_atualizar: schemas.PacoteUpdate, db:
     db.commit()
     db.refresh(pacote)
 
+    return schemas.PacoteResponse.model_validate(pacote).model_dump()
+
+@router.patch("/{pacote_id}/fechar", response_model=schemas.PacoteResponse)
+def fechar_pacote(pacote_id: int, db: Session = Depends(get_db)):
+    """Marca o pacote como fechado (ciclo concluído, aguardando acerto)."""
+    pacote = db.query(models.Pacote).options(
+        joinedload(models.Pacote.cachorro).joinedload(models.Cachorro.cliente),
+        joinedload(models.Pacote.agendamentos)
+    ).filter(models.Pacote.id == pacote_id).first()
+
+    if not pacote:
+        raise HTTPException(status_code=404, detail="Pacote não encontrado")
+    
+    pacote.fechado = True
+    db.commit()
+    db.refresh(pacote)
     return schemas.PacoteResponse.model_validate(pacote).model_dump()
 
 @router.delete("/{pacote_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -226,7 +252,7 @@ def listar_agendamentos_pacote(pacote_id: int, db: Session = Depends(get_db)):
     agendamentos = db.query(models.Agendamento).filter(
         models.Agendamento.pacote_id == pacote_id
     ).order_by(models.Agendamento.data_banho).all()
-    return agendamentos
+    return [schemas.AgendamentoResponse.model_validate(ag).model_dump() for ag in agendamentos]
 
 @router.post("/{pacote_id}/agendamento-extra", response_model=schemas.AgendamentoResponse)
 def adicionar_agendamento_extra(
@@ -244,4 +270,4 @@ def adicionar_agendamento_extra(
     db.add(db_ag)
     db.commit()
     db.refresh(db_ag)
-    return db_ag
+    return schemas.AgendamentoResponse.model_validate(db_ag).model_dump()

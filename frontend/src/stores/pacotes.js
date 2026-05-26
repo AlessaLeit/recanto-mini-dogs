@@ -12,9 +12,12 @@ export const usePacotesStore = defineStore('pacotes', () => {
   const erro = ref(null)
 
   const totalPacotes = computed(() => pacotes.value.length)
-  const pacotesAtivos = computed(() => pacotes.value.filter(p => p.ativo))
-  const pacotesAbertos = computed(() => pacotes.value.filter(p => p.status_pagamento === 'em_aberto'))
-  const totalReceitaPrevista = computed(() => pacotes.value.reduce((sum, p) => sum + (p.valor_cobrado * p.limite_banhos_mes || 0), 0))
+  // Filtra apenas os ativos. Consideramos p.ativo !== false para aceitar registros onde o campo seja null
+  const pacotesAtivos = computed(() => pacotes.value.filter(p => p.ativo !== false))
+  const pacotesAbertos = computed(() => pacotesAtivos.value.filter(p => p.status_pagamento === 'em_aberto'))
+  
+  // Receita prevista usa apenas pacotes ativos e não multiplica mais, pois valor_cobrado já é o total
+  const totalReceitaPrevista = computed(() => pacotesAtivos.value.reduce((sum, p) => sum + (Number(p.valor_cobrado) || 0), 0))
 
   async function fetchPacotes(params = {}) {
     loading.value = true
@@ -100,6 +103,23 @@ export const usePacotesStore = defineStore('pacotes', () => {
     }
   }
 
+  async function fecharPacote(id) {
+    try {
+      const response = await pacoteApi.fechar(id)
+      const index = pacotes.value.findIndex(p => p.id === id)
+      if (index !== -1) {
+        pacotes.value[index] = response.data
+      }
+      if (pacoteAtual.value?.id === id) {
+        pacoteAtual.value = response.data
+      }
+      return response.data
+    } catch (err) {
+      console.error(err.response?.data?.detail || 'Erro ao fechar pacote')
+      throw err
+    }
+  }
+
   // ✅ NOVO: Atualizar apenas a data de um agendamento
   async function updateAgendamentoData(id, data_banho) {
     try {
@@ -125,7 +145,7 @@ export const usePacotesStore = defineStore('pacotes', () => {
     }
   }
 
-  // ✅ NOVO: Remover agendamento
+  // Remover agendamento
   async function removerAgendamento(id) {
     try {
       await pacoteApi.deletarAgendamento(id)
@@ -140,7 +160,7 @@ export const usePacotesStore = defineStore('pacotes', () => {
     }
   }
 
-  // ✅ NOVO: Adicionar agendamento extra
+  // Adicionar agendamento extra
   async function adicionarExtra(pacoteId, data_banho) {
     try {
       const response = await pacoteApi.adicionarAgendamentoExtra(pacoteId, data_banho)
@@ -191,6 +211,7 @@ export const usePacotesStore = defineStore('pacotes', () => {
     criarPacote,
     atualizarPacote,
     deletarPacote,
+    fecharPacote,
     registrarPagamento,
     updateAgendamento,
     updateAgendamentoData,
@@ -198,4 +219,3 @@ export const usePacotesStore = defineStore('pacotes', () => {
     adicionarExtra
   }
 })
-

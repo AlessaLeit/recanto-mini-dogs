@@ -211,15 +211,6 @@ pytest
 
 ## Troubleshooting
 
-| Problema | Solução |
-|----------|---------|
-| Porta 8000 ocupada | `taskkill /F /IM uvicorn.exe` (Windows) ou `killall uvicorn` (Linux/Mac) |
-| Backend não inicia | Verifique se `pip install -r backend/requirements.txt` foi executado |
-| Frontend não conecta à API | Certifique-se de que o backend está rodando antes do frontend |
-| Erro de CORS | Verifique se o backend está em `localhost:8000` e o frontend em `localhost:5173` |
-| Banco não conecta (Docker) | Aguarde o healthcheck do PostgreSQL (`docker-compose logs -f postgres_local`) |
-| `node_modules` ausente | Execute `npm install` dentro da pasta `frontend/` |
-
 ---
 
 ## Autor

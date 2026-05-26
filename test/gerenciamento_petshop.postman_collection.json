@@ -1,0 +1,677 @@
+{
+  "info": {
+    "_postman_id": "79f0bc8b-891d-4f35-9297-00fc75fb922f",
+    "name": "Gerenciamento Banho e Tosa",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "52079776",
+    "_collection_link": "https://go.postman.co/collection/52079776-79f0bc8b-891d-4f35-9297-00fc75fb922f?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Login",
+      "item": [
+        {
+          "name": "Login Válido",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"username\": \"admin@email.com\",\r\n  \"password\": \"admin123\"\r\n}\r\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/auth/login",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login Inválido",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"username\": \"admin@email.com\",\r\n  \"password\": \"falso_admin123\"\r\n}\r\n"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/auth/login",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cliente",
+      "item": [
+        {
+          "name": "Criar Cliente Válido",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"endereco\": \"Rua da Liberdade, 123 - Canoinhas/SC\",\r\n  \"nome\": \"Maria Roberta\",\r\n  \"telefone\": \"(11) 98765-4321\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/clientes/",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "v1",
+                "clientes",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Criar Cliente Inválido",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"endereco\": \"Rua da Liberdade, 123 - Canoinhas/SC\",\r\n  \"telefone\": \"(11) 98765-4321\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/clientes/",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "v1",
+                "clientes",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Clientes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"endereco\": \"Rua da Liberdade, 123 - Canoinhas/SC\",\r\n  \"telefone\": \"(11) 98765-4321\"\r\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/clientes/",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "v1",
+                "clientes",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Filtrar Cliente",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"nome\": \"\",\r\n    \"telefone\":\"(11) 98765-4321\",\r\n    \"endereco\":\"Rua das Flores, 2122 - São Paulo/SP\"\r\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/clientes/1",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "v1",
+                "clientes",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Atualizar Cliente Válido",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"telefone\":\"(11) 98765-4321\",\r\n    \"endereco\":\"Rua das Flores, 123 - São Paulo/SP\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/clientes/2",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "v1",
+                "clientes",
+                "2"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Atualizar Cliente Inválido",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"nome\": \"\",\r\n    \"telefone\":\"(11) 98765-4321\",\r\n    \"endereco\":\"Rua das Flores, 2122 - São Paulo/SP\"\r\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/clientes/2",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "v1",
+                "clientes",
+                "2"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Deletar Cliente",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8000/api/v1/clientes/3",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "v1",
+                "clientes",
+                "3"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cachorros",
+      "item": [
+        {
+          "name": "Criar Cachorro Válido",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"cliente_id\": 1,\r\n  \"nome\": \"Rex\",\r\n  \"porte\": \"grande\",\r\n  \"raca\": \"Golden Retriever\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/cachorros/",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "v1",
+                "cachorros",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Criar Cachorro Inválido",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"cliente_id\": 1,\r\n  \"nome\": \"\",\r\n  \"porte\": \"grande\",\r\n  \"raca\": \"Golden Retriever\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/cachorros/",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "v1",
+                "cachorros",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Cachorros",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/cachorros/",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "v1",
+                "cachorros",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Filtrar Cachorro",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/cachorros/1",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "v1",
+                "cachorros",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Atualizar Cachorro Válido",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"nome\": \"Emy\",\r\n  \"observacoes\": \"Mudei as observacoes\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/cachorros/1",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "v1",
+                "cachorros",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Atualizar Cachorro Inválido",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"nome\": \"\",\r\n  \"observacoes\": \"Mudei as observacoes, tirei o nome\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/cachorros/1",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "v1",
+                "cachorros",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Deletar Cachorro",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8000/api/v1/cachorros/1",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "v1",
+                "cachorros",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Pacotes",
+      "item": [
+        {
+          "name": "Criar Pacote Válido",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbkBlbWFpbC5jb20iLCJleHAiOjE3Nzk3NTU4NzN9.4pemSU7lCCd3uEXBsyp7o3VHiYMg6KGY4Az7kkKt25Y",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"cachorro_id\": 1,\r\n  \"tipo_plano\": \"mensal\",\r\n  \"dia_da_semana\": \"terca\",\r\n  \"valor_banho_base\": 1,\r\n  \"valor_cobrado\": 1,\r\n  \"valor_transporte\": 0,\r\n  \"limite_banhos_mes\": 0,\r\n  \"ativo\": true\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/pacotes/",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "v1",
+                "pacotes",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Criar Pacote Inválido",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbkBlbWFpbC5jb20iLCJleHAiOjE3Nzk3NTU4NzN9.4pemSU7lCCd3uEXBsyp7o3VHiYMg6KGY4Az7kkKt25Y",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"cachorro_id\": 1,\r\n  \"tipo_plano\": \"\",\r\n  \"dia_da_semana\": \"terca\",\r\n  \"valor_banho_base\": 1,\r\n  \"valor_cobrado\": 1,\r\n  \"valor_transporte\": 0,\r\n  \"limite_banhos_mes\": 0,\r\n  \"ativo\": true\r\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/pacotes/",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "v1",
+                "pacotes",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Pacotes",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbkBlbWFpbC5jb20iLCJleHAiOjE3Nzk3NTU4NzN9.4pemSU7lCCd3uEXBsyp7o3VHiYMg6KGY4Az7kkKt25Y",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8000/api/v1/pacotes/",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "v1",
+                "pacotes",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Filtrar Pacote",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbkBlbWFpbC5jb20iLCJleHAiOjE3Nzk3NTU4NzN9.4pemSU7lCCd3uEXBsyp7o3VHiYMg6KGY4Az7kkKt25Y",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "http://localhost:8000/api/v1/pacotes/1",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "v1",
+                "pacotes",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

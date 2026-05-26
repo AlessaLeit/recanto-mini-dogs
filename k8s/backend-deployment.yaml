@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: alessaleit/pacotesbanho-backend:latest
+          image: alessaleit/pacotesbanho-backend:1.0.1
           imagePullPolicy: Never
           ports:
             - containerPort: 8000
@@ -47,3 +47,15 @@ spec:
                 secretKeyRef:
                   name: app-secret
                   key: DB_NAME
+
+            - name: ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: ADMIN_EMAIL
+
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: ADMIN_PASSWORD

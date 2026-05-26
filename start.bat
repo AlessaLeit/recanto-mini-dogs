@@ -30,19 +30,31 @@ if %errorlevel% neq 0 (
     exit /b %errorlevel%
 )
 
-REM 2. Start Backend (nova janela)
+REM 2. Migrations
 echo.
-echo ⚙️  [2/4] Iniciando Backend FastAPI (porta 8000)...
+echo 🗄️  [2/5] Sincronizando Banco de Dados...
+echo    -------------------------------------------------------
+echo    IMPORTANTE: Se estiver usando DOCKER, voce DEVE rodar:
+echo    docker-compose exec backend alembic upgrade head
+echo    -------------------------------------------------------
+cd /d "%~dp0backend"
+call ..\venv\Scripts\activate
+call alembic upgrade head
+cd /d "%~dp0"
+
+REM 3. Start Backend (nova janela)
+echo.
+echo ⚙️  [3/5] Iniciando Backend FastAPI (porta 8000)...
 start "Backend FastAPI" cmd /k "cd /d %~dp0backend && ..\venv\Scripts\activate && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
-REM 3. Aguardar Backend
+REM 4. Aguardar Backend
 echo.
-echo ⏳ [3/4] Aguardando backend iniciar (10s)...
+echo ⏳ [4/5] Aguardando backend iniciar (10s)...
 timeout /t 10 /nobreak >nul
 
-REM 4. Frontend (na mesma janela)
+REM 5. Frontend (na mesma janela)
 echo.
-echo 🌐 [4/4] Iniciando Frontend Vue (porta 5173)...
+echo 🌐 [5/5] Iniciando Frontend Vue (porta 5173)...
 cd /d "%~dp0frontend"
 if not exist "node_modules" (
     echo 📦 Instalando frontend deps...
