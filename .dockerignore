@@ -1,0 +1,32 @@
+# Byte-compiled / optimized / DLL files
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
+
+# Ambientes Virtuais e Dependências Locais
+venv/
+.venv/
+node_modules/
+dist/
+build/
+
+# Testes e Relatórios (Importante incluir o htmlcov aqui também)
+.pytest_cache/
+.coverage
+htmlcov/
+test/
+
+# Logs e Debugging
+*.log
+npm-debug.log*
+
+# Segredos e Configurações Sensíveis (Segurança!)
+.env
+.env.*
+backend/.env
+
+# Diversos
+.git/
+*.db
+start.bat
+README.md

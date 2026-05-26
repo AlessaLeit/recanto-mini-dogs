@@ -17,6 +17,16 @@ class TipoPlano(str, enum.Enum):
     MENSAL = "mensal"        # Até 1 banho/mês
 
 
+class DiaSemana(str, enum.Enum):
+    """Dias da semana aceitos para criação de agendamentos automáticos."""
+    TERCA = "terca"
+    QUARTA = "quarta"
+    QUINTA = "quinta"
+    SEXTA = "sexta"
+    SABADO = "sabado"
+
+
+
 class Pacote(Base):
     __tablename__ = "pacotes"
     
@@ -34,8 +44,24 @@ class Pacote(Base):
         nullable=False
     )
     
-    # Valor acordado para o pacote mensal
+    # Valor base por banho (exibido no detalhe do pacote)
+    valor_banho_base: Mapped[float] = mapped_column(Float, nullable=False)
+
+    # Valor acordado para o pacote (valor_banho_base * quantidade do plano)
     valor_cobrado: Mapped[float] = mapped_column(Float, nullable=False)
+
+    # Valor de transporte para o pacote
+    valor_transporte: Mapped[float] = mapped_column(Float, default=0.0, server_default="0.0", nullable=False)
+
+
+    # Dia da semana escolhido para gerar agendamentos automáticos
+    dia_da_semana: Mapped[DiaSemana] = mapped_column(
+        Enum(DiaSemana, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
+    )
+
+
+
     
     # Campos de pagamento (opcionais - pacote pode estar em aberto)
     valor_pago: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -88,13 +114,32 @@ class Pacote(Base):
             return "pago"
         return "parcial"
     
+    @property
+    def total_agendamentos(self) -> int:
+        """Retorna o total de agendamentos vinculados"""
+        return len(self.agendamentos) if self.agendamentos else 0
+
+    @property
+    def pet_nome(self) -> Optional[str]:
+        """Retorna o nome do pet vinculado"""
+        return self.cachorro.nome if self.cachorro else None
+
+    @property
+    def cliente_nome(self) -> Optional[str]:
+        """Retorna o nome do cliente vinculado"""
+        return self.cachorro.cliente.nome if self.cachorro and self.cachorro.cliente else None
+
     def to_dict(self) -> dict:
         """Serialização completa incluindo pet nome e agendamentos para frontend."""
         return {
             "id": self.id,
             "cachorro_id": self.cachorro_id,
             "tipo_plano": self.tipo_plano.value if self.tipo_plano else None,
+            "dia_da_semana": self.dia_da_semana.value if self.dia_da_semana else None,
+
+            "valor_banho_base": self.valor_banho_base,
             "valor_cobrado": self.valor_cobrado,
+            "valor_transporte": self.valor_transporte,
             "valor_pago": self.valor_pago,
             "data_pagamento": self.data_pagamento.isoformat() if self.data_pagamento else None,
             "ativo": self.ativo,
@@ -108,4 +153,7 @@ class Pacote(Base):
         }
     
     def __repr__(self) -> str:
-        return f"<Pacote(id={self.id}, tipo='{self.tipo_plano.value}', ativo={self.ativo})>"
+        return (
+            f"<Pacote(id={self.id}, tipo='{self.tipo_plano.value}', "
+            f"dia='{self.dia_da_semana.value}', ativo={self.ativo})>"
+        )

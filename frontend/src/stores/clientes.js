@@ -5,6 +5,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import api from '../api/index.js'
 import { clienteApi } from '../api/clientes'
+import { cachorroApi } from '../api/cachorros'
 
 export const useClientesStore = defineStore('clientes', () => {
   // State
@@ -28,7 +29,7 @@ export const useClientesStore = defineStore('clientes', () => {
     erro.value = null
     try {
       const response = await clienteApi.listar(params)
-      clientes.value = response.data
+      clientes.value = Array.isArray(response.data) ? response.data : []
     } catch (err) {
       erro.value = err.response?.data?.detail || 'Erro ao carregar clientes'
       console.error('Clientes fetch error:', err)
@@ -52,16 +53,20 @@ export const useClientesStore = defineStore('clientes', () => {
   }
 
   async function criarCliente(data) {
+    loading.value = true
     try {
       const response = await clienteApi.criar(data)
       clientes.value.unshift(response.data)
       return response.data
     } catch (err) {
       throw err.response?.data?.detail || 'Erro ao criar cliente'
+    } finally {
+      loading.value = false
     }
   }
 
   async function atualizarCliente(id, data) {
+    loading.value = true
     try {
       const response = await clienteApi.atualizar(id, data)
       const index = clientes.value.findIndex(c => c.id === id)
@@ -74,10 +79,13 @@ export const useClientesStore = defineStore('clientes', () => {
       return response.data
     } catch (err) {
       throw err.response?.data?.detail || 'Erro ao atualizar cliente'
+    } finally {
+      loading.value = false
     }
   }
 
   async function deletarCliente(id) {
+    loading.value = true
     try {
       await clienteApi.deletar(id)
       clientes.value = clientes.value.filter(c => c.id !== id)
@@ -86,22 +94,56 @@ export const useClientesStore = defineStore('clientes', () => {
       }
     } catch (err) {
       throw err.response?.data?.detail || 'Erro ao deletar cliente'
+    } finally {
+      loading.value = false
     }
   }
 
-  // Nova ação: adicionar cachorro e refresh cliente específico
   async function adicionarCachorro(clienteId, data) {
+    loading.value = true
     try {
-      await api.post('/cachorros/', data)
-      // Refresh lista completa (backend agora inclui cachorros)
+      await cachorroApi.criar(data)
+      // Refresh lista para garantir que os vínculos e IDs venham corretos do banco
       await fetchClientes()
       return true
     } catch (err) {
       throw err.response?.data?.detail || 'Erro ao adicionar cachorro'
+    } finally {
+      loading.value = false
     }
   }
 
-  return {
+  // Atualizar cachorro
+  async function atualizarCachorro(clienteId, cachorroId, data) {
+    loading.value = true
+    try {
+      const response = await cachorroApi.atualizar(cachorroId, data)
+      // Refresh lista completa para atualizar a UI
+      await fetchClientes()
+      return response.data
+    } catch (err) {
+      throw err.response?.data?.detail || 'Erro ao atualizar cachorro'
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Deletar cachorro
+  async function deletarCachorro(clienteId, cachorroId) {
+    loading.value = true
+    try {
+      await cachorroApi.deletar(cachorroId)
+      // Refresh lista completa para atualizar a UI
+      await fetchClientes()
+      return true
+    } catch (err) {
+      throw err.response?.data?.detail || 'Erro ao deletar cachorro'
+    } finally {
+      loading.value = false
+    }
+  }
+
+return {
     clientes,
     clienteAtual,
     loading,
@@ -113,7 +155,8 @@ export const useClientesStore = defineStore('clientes', () => {
     criarCliente,
     atualizarCliente,
     deletarCliente,
-    adicionarCachorro
+    adicionarCachorro,
+    atualizarCachorro,
+    deletarCachorro
   }
 })
-
