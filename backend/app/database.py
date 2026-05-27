@@ -19,23 +19,20 @@ class Settings(BaseSettings):
     )
 
     DATABASE_URL: str = "sqlite:///./banho_tosa.db"
-    API_HOST: str = "0.0.0.0"
-    API_PORT: int = 8000
-    DEBUG: bool = True
-    ADMIN_USER: str = "admin@example.com"
-    ADMIN_PASSWORD: str = "admin123"
+    DEBUG: bool = False
+
+    # Segurança e Autenticação
+    SECRET_KEY: str
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ADMIN_EMAIL: str
+    ADMIN_PASSWORD: str
 
 
 # Instância global das configurações
 settings = Settings()
 
 _database_url = settings.DATABASE_URL
-
-# Melhora a detecção de ambiente: Se não estivermos no Docker (onde a variável 
-# DOCKER_CONTAINER costuma ser setada ou o host do banco não resolve), 
-# e a URL apontar para um host de container, podemos forçar SQLite.
-if os.getenv("DATABASE_URL") is None and not os.path.exists("/.dockerenv"):
-    _database_url = "sqlite:///./banho_tosa.db"
 
 # Criação do engine com configurações específicas para SQLite/PostgreSQL
 if _database_url.startswith("sqlite"):
