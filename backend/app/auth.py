@@ -1,21 +1,16 @@
-import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel
-from dotenv import load_dotenv
+from app.database import settings
 
-# Carrega as variáveis do arquivo .env
-load_dotenv()
-
-SECRET_KEY = os.getenv("SECRET_KEY", "desenvolvimento-chave-segura-padrao")
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
-ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@admin.com").strip().lower()
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
-
+SECRET_KEY = settings.SECRET_KEY
+ALGORITHM = settings.ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+ADMIN_EMAIL = settings.ADMIN_EMAIL.strip().lower()
+ADMIN_PASSWORD = settings.ADMIN_PASSWORD
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
