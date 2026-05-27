@@ -106,7 +106,10 @@
       <!-- Seção de Exclusão: Movida para o final do card de agendamentos -->
       <div class="footer-danger-zone">
         <button @click="confirmarDeletarPacote" class="btn btn-perigo" title="Excluir este pacote">🗑️ Excluir Pacote</button>
-        <button v-if="pacote?.status_pagamento === 'em_aberto'" @click="fecharPacote" class="btn btn-ghost" style="border-color: var(--dourado); color: var(--marrom);">🔒 Fechar Pacote</button>
+        <div class="footer-actions">
+          <button v-if="pacote?.status_pagamento === 'em_aberto'" @click="fecharPacote" class="btn btn-ghost" style="border-color: var(--dourado); color: var(--marrom);">🔒 Fechar Pacote</button>
+          <button v-if="pacote?.status_pagamento !== 'pago'" @click="abrirPagamento" class="btn btn-primario" style="margin-left: 0.5rem;">💰 Marcar como Pago</button>
+        </div>
       </div>
     <!-- ── MODAL: Editar Data ── -->
     <div class="modal" v-if="showEditData">
@@ -251,6 +254,29 @@
       </div>
     </div>
 
+    <!-- ── MODAL: Registrar Pagamento ── -->
+    <div class="modal" v-if="showModalPagamento">
+      <div class="modal-overlay" @click="showModalPagamento = false"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Registrar Pagamento</h3>
+          <p class="modal-sub">💰 {{ pacote?.pet_nome }}</p>
+        </div>
+        <div class="form-group">
+          <label>Valor Pago (R$)</label>
+          <input type="number" step="0.01" v-model.number="formPagamento.valor_pago" />
+        </div>
+        <div class="form-group">
+          <label>Data do Pagamento</label>
+          <input type="date" v-model="formPagamento.data_pagamento" />
+        </div>
+        <div class="modal-actions">
+          <button @click="showModalPagamento = false" class="btn btn-cancelar">Cancelar</button>
+          <button @click="confirmarPagamento" class="btn btn-primario">Confirmar Recebimento</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ── MODAL: Confirmar Remoção ── -->
     <div class="modal" v-if="showConfirmRemove">
       <div class="modal-overlay" @click="showConfirmRemove = false"></div>
@@ -290,6 +316,7 @@ const showConfirmRemove = ref(false)
 const showConfirmDeletePacote = ref(false)
 const showModalExtras = ref(false)
 const showModalEditPacote = ref(false)
+const showModalPagamento = ref(false)
 
 // Dados dos modais
 const agEditando = ref(null)
@@ -299,6 +326,7 @@ const agRemovendo = ref(null)
 const agExtras = ref(null)
 const formExtras = ref({ info: '', valor_extra: 0, status_presenca: 'pendente' })
 const formPacote = ref({ tipo_plano: '', dia_da_semana: '', valor_banho_base: 0, valor_cobrado: 0, valor_transporte: 0 })
+const formPagamento = ref({ valor_pago: 0, data_pagamento: '' })
 const valorSugerido = ref(0)
 const sugestaoVisivel = ref(false)
 
@@ -366,6 +394,21 @@ async function fecharPacote() {
     await carregarPacote()
     alert('Pacote fechado com sucesso! Agora você pode registrar o pagamento.')
   } catch (err) { alert('Erro ao fechar pacote: ' + err) }
+}
+
+function abrirPagamento() {
+  formPagamento.value.valor_pago = pacote.value.valor_cobrado
+  formPagamento.value.data_pagamento = new Date().toISOString().split('T')[0]
+  showModalPagamento.value = true
+}
+
+async function confirmarPagamento() {
+  try {
+    await pacotesStore.registrarPagamento(pacoteId.value, formPagamento.value.valor_pago, formPagamento.value.data_pagamento)
+    showModalPagamento.value = false
+    await carregarPacote()
+    alert('Pagamento registrado com sucesso!')
+  } catch (err) { alert('Erro ao registrar pagamento: ' + err) }
 }
 
 function abrirEditarPacote() {
