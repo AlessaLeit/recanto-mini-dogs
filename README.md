@@ -209,7 +209,7 @@ pytest
 
 ---
 
-## Autor
+[![SonarQube Cloud](https://sonarcloud.io/images/project_badges/sonarcloud-light.svg)](https://sonarcloud.io/summary/new_code?id=AlessaLeit_recanto-mini-dogs)
 
 Desenvolvido para gestão do **Canil Recanto Mini Dogs**.
 
