@@ -18,6 +18,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest
+          pip install pytest pytest-cov
       - name: Run tests
-        run: pytest test_unitario.py
+        run: |
+          pytest test_unitario.py
