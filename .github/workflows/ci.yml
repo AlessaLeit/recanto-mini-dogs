@@ -24,4 +24,4 @@ jobs:
         pip install fastapi playwright pytest pytest-cov
 
     - name: Run unit tests
-      run: pytest test_unitario.py
+      run: pytest test/test_unitario.py
