@@ -1,4 +1,5 @@
 # Sistema de Gestão de Banho & Tosa
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=AlessaLeit_recanto-mini-dogs&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=AlessaLeit_recanto-mini-dogs)
 
 Sistema completo para gerenciamento de pacotes mensais de banho e tosa, controle de clientes/pets, agendamentos e relatórios financeiros.
 
@@ -211,4 +212,3 @@ pytest
 
 Desenvolvido para gestão do **Canil Recanto Mini Dogs**.
 
-[![SonarQube Cloud](https://sonarcloud.io/images/project_badges/sonarcloud-light.svg)](https://sonarcloud.io/summary/new_code?id=AlessaLeit_recanto-mini-dogs)
