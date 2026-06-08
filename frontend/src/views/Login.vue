@@ -10,13 +10,13 @@
 
       <form @submit.prevent="handleSubmit" class="login-form">
         <div class="form-group">
-          <label>E-mail</label>
-          <input v-model="form.email" type="email" placeholder="seu@email.com" required />
+          <label for="email">E-mail</label>
+          <input id="email" v-model="form.email" type="email" placeholder="seu@email.com" required />
         </div>
 
         <div class="form-group">
-          <label>Senha</label>
-          <input v-model="form.password" type="password" placeholder="••••••••" required />
+          <label for="password">Senha</label>
+          <input id="password" v-model="form.password" type="password" placeholder="••••••••" required />
         </div>
 
         <div v-if="error" class="error-message">

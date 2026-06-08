@@ -18,12 +18,20 @@ spec:
         app: backend
 
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: backend
-          image: alessaleit/pacotesbanho-backend:1.0.1
+          image: alessaleit/pacotesbanho-backend:1.0.3
           imagePullPolicy: Never
           ports:
             - containerPort: 8000
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
 
           envFrom:
             - configMapRef:

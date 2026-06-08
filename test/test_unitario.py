@@ -96,7 +96,7 @@ def test_unit_filtro_fim_do_mes():
 
 def test_unit_calculo_valor_total():
     """Cenário: Valida se a multiplicação do valor base pelo plano está correta"""
-    assert calcular_valor_total_pacote(50.0, "semanal") == 200.0
-    assert calcular_valor_total_pacote(60.0, "quinzenal") == 120.0
-    assert calcular_valor_total_pacote(80.0, "mensal") == 80.0
-    assert calcular_valor_total_pacote(50.0, "invalido") == 0.0
+    assert calcular_valor_total_pacote(50.0, "semanal") == pytest.approx(200.0)
+    assert calcular_valor_total_pacote(60.0, "quinzenal") == pytest.approx(120.0)
+    assert calcular_valor_total_pacote(80.0, "mensal") == pytest.approx(80.0)
+    assert calcular_valor_total_pacote(50.0, "invalido") == pytest.approx(0.0)

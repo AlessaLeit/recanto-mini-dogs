@@ -6,14 +6,14 @@
 
     <div class="filtros-card">
       <div class="form-group">
-        <label>Mês</label>
-        <select v-model="mes">
+        <label for="filtro-mes">Mês</label>
+        <select id="filtro-mes" v-model="mes">
           <option v-for="(nome, index) in meses" :key="index" :value="index + 1">{{ nome }}</option>
         </select>
       </div>
       <div class="form-group">
-        <label>Ano</label>
-        <input v-model.number="ano" type="number" min="2020" max="2030" />
+        <label for="filtro-ano">Ano</label>
+        <input id="filtro-ano" v-model.number="ano" type="number" min="2020" max="2030" />
       </div>
       <button @click="gerarRelatorio" class="btn btn-primario" :disabled="loading">
         {{ loading ? 'Gerando...' : '📊 Gerar Relatório' }}

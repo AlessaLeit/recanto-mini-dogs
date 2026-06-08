@@ -4,15 +4,7 @@ import api from '../api/index'
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     token: localStorage.getItem('token') || null,
-    user: (() => {
-      try {
-        const savedUser = localStorage.getItem('user')
-        return savedUser ? JSON.parse(savedUser) : null
-      } catch (e) {
-        console.error('Erro ao recuperar usuário do localStorage:', e)
-        return null
-      }
-    })()
+    user: JSON.parse(localStorage.getItem('user')) || null
   }),
   
   getters: {
@@ -35,8 +27,9 @@ export const useAuthStore = defineStore('auth', {
         // O interceptor em api/index.js usará o novo token automaticamente
         return true
       } catch (error) {
-        console.error('Falha no login:', error)
-        throw error.response?.data?.detail || 'Erro ao entrar'
+        const errorMsg = error.response?.data?.detail || 'E-mail ou senha inválidos'
+        console.error('Falha no login:', errorMsg)
+        throw errorMsg
       }
     },
     logout() {
