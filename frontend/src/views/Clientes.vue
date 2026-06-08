@@ -10,8 +10,10 @@
     <div class="search-card">
       <input
         v-model="busca"
+        id="busca-clientes"
         type="text"
         placeholder="🔍  Buscar por nome do cliente ou pet..."
+        aria-label="Buscar por nome do cliente ou pet"
         class="search-input"
       />
     </div>
@@ -61,16 +63,16 @@
         <h3 class="modal-title">{{ editando ? 'Editar' : 'Novo' }} Cliente</h3>
         <form @submit.prevent="salvarCliente">
           <div class="form-group">
-            <label>Nome *</label>
-            <input v-model="formCliente.nome" required />
+            <label for="cliente-nome">Nome *</label>
+            <input id="cliente-nome" v-model="formCliente.nome" required />
           </div>
           <div class="form-group">
-            <label>Telefone</label>
-            <input v-model="formCliente.telefone" />
+            <label for="cliente-telefone">Telefone</label>
+            <input id="cliente-telefone" v-model="formCliente.telefone" />
           </div>
           <div class="form-group">
-            <label>Endereço</label>
-            <input v-model="formCliente.endereco" />
+            <label for="cliente-endereco">Endereço</label>
+            <input id="cliente-endereco" v-model="formCliente.endereco" />
           </div>
           <div class="form-actions">
             <button type="button" @click="showNovoCliente = false" class="btn btn-cancelar">Cancelar</button>
@@ -87,24 +89,24 @@
         <h3 class="modal-title">{{ editandoDog ? 'Editar' : 'Novo' }} Pet — {{ clienteAtual?.nome }}</h3>
         <form @submit.prevent="salvarCachorro">
           <div class="form-group">
-            <label>Nome *</label>
-            <input v-model="formCachorro.nome" required />
+            <label for="pet-nome">Nome *</label>
+            <input id="pet-nome" v-model="formCachorro.nome" required />
           </div>
           <div class="form-group">
-            <label>Raça</label>
-            <input v-model="formCachorro.raca" />
+            <label for="pet-raca">Raça</label>
+            <input id="pet-raca" v-model="formCachorro.raca" />
           </div>
           <div class="form-group">
-            <label>Porte *</label>
-            <select v-model="formCachorro.porte" required>
+            <label for="pet-porte">Porte *</label>
+            <select id="pet-porte" v-model="formCachorro.porte" required>
               <option value="pequeno">Pequeno</option>
               <option value="medio">Médio</option>
               <option value="grande">Grande</option>
             </select>
           </div>
           <div class="form-group">
-            <label>Observações</label>
-            <textarea v-model="formCachorro.observacoes" rows="3"></textarea>
+            <label for="pet-obs">Observações</label>
+            <textarea id="pet-obs" v-model="formCachorro.observacoes" rows="3"></textarea>
           </div>
           <div class="form-actions">
             <button type="button" @click="showNovoCachorro = false" class="btn btn-cancelar">Cancelar</button>

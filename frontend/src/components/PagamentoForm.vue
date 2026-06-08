@@ -9,10 +9,11 @@
         Valor cobrado: <strong>R$ {{ formatarValor(pacote?.valor_cobrado) }}</strong>
       </p>
 
-      <form @submit.prevent="handleSubmit">
+          <form @submit.prevent="handleSubmit">
         <div class="form-group">
-          <label>Valor Pago (R$)</label>
+          <label for="valor_pago">Valor Pago (R$)</label>
           <input
+            id="valor_pago"
             v-model.number="form.valor_pago"
             type="number"
             step="0.01"
@@ -21,8 +22,9 @@
           />
         </div>
         <div class="form-group">
-          <label>Data do Pagamento</label>
+          <label for="data_pagamento">Data do Pagamento</label>
           <input
+            id="data_pagamento"
             v-model="form.data_pagamento"
             type="date"
             required

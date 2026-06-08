@@ -32,6 +32,7 @@ spec:
         app: postgres
 
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: postgres
           image: postgres:16
@@ -57,6 +58,15 @@ spec:
 
           ports:
             - containerPort: 5432
+          resources:
+          limits:
+              memory: "1Gi"
+              cpu: "500m"
+              ephemeral-storage: "2Gi" # Limite de armazenamento temporário
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+              ephemeral-storage: "1Gi"
 
           volumeMounts:
             - name: postgres-data

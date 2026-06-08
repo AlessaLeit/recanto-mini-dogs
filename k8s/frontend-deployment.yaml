@@ -14,12 +14,20 @@ spec:
       labels:
         app: frontend
     spec:
+      automountServiceAccountToken: false
       containers:
       - name: frontend
-        image: alessaleit/pacotesbanho-frontend:1.0.1
+        image: alessaleit/pacotesbanho-frontend:1.0.3
         imagePullPolicy: Never
         ports:
         - containerPort: 80
+        resources:
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
         env:
-        - name: VITE_API_URL
-          value: "http://backend-service:8000/api/v1"
+        - name: API_HOST
+          value: backend-service

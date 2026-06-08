@@ -16,12 +16,12 @@
     </div>
 
     <div class="filters-bar" v-if="!cachorroId">
-      <select v-model="filtroStatus" class="filter-select">
+      <select v-model="filtroStatus" class="filter-select" aria-label="Filtrar por status do pacote">
         <option value="ativos">Pacotes Ativos</option>
         <option value="inativos">Pacotes Inativos</option>
         <option value="todos">Todos</option>
       </select>
-      <select v-model="filtroPagamento" class="filter-select">
+      <select v-model="filtroPagamento" class="filter-select" aria-label="Filtrar por status de pagamento">
         <option value="todos">Todos os Status</option>
         <option value="em_aberto">Em Aberto</option>
         <option value="fechado">Fechado (Aguardando)</option>
@@ -51,8 +51,8 @@
         <h3 class="modal-title" v-else>Novo Pacote</h3>
         <form @submit.prevent="criarPacote">
           <div class="form-group">
-            <label>Cachorro</label>
-            <select v-model="novoPacote.cachorro_id" required>
+            <label for="novo-cachorro">Cachorro</label>
+            <select id="novo-cachorro" v-model="novoPacote.cachorro_id" required>
               <option v-if="cachorroId" :value="cachorroId" selected>{{ cachorroSelecionado?.nome }} (pré-selecionado)</option>
               <option v-else v-for="cachorro in cachorros" :key="cachorro.id" :value="cachorro.id">
                 {{ cachorro.nome }} ({{ cachorro.cliente?.nome }})
@@ -60,16 +60,16 @@
             </select>
           </div>
           <div class="form-group">
-            <label>Tipo de Plano</label>
-            <select v-model="novoPacote.tipo_plano" @change="calcularSugeridoNovo" required>
+            <label for="novo-tipo-plano">Tipo de Plano</label>
+            <select id="novo-tipo-plano" v-model="novoPacote.tipo_plano" @change="calcularSugeridoNovo" required>
               <option value="semanal">Semanal (4 banhos/mês)</option>
               <option value="quinzenal">Quinzenal (2 banhos/mês)</option>
               <option value="mensal">Mensal (1 banho/mês)</option>
             </select>
           </div>
           <div class="form-group">
-            <label>Dia da Semana</label>
-            <select v-model="novoPacote.dia_da_semana" required>
+            <label for="novo-dia-semana">Dia da Semana</label>
+            <select id="novo-dia-semana" v-model="novoPacote.dia_da_semana" required>
               <option value="terca">Terça-feira</option>
               <option value="quarta">Quarta-feira</option>
               <option value="quinta">Quinta-feira</option>
@@ -78,16 +78,16 @@
             </select>
           </div>
           <div class="form-group">
-            <label>Valor Base do Banho (R$)</label>
-            <input v-model.number="novoPacote.valor_banho_base" type="number" step="0.01" @input="calcularSugeridoNovo" required />
+            <label for="novo-valor-base">Valor Base do Banho (R$)</label>
+            <input id="novo-valor-base" v-model.number="novoPacote.valor_banho_base" type="number" step="0.01" @input="calcularSugeridoNovo" required />
           </div>
           <div class="form-group">
-            <label>Transporte Total (R$)</label>
-            <input v-model.number="novoPacote.valor_transporte" type="number" step="0.01" @input="calcularSugeridoNovo" />
+            <label for="novo-valor-transporte">Transporte Total (R$)</label>
+            <input id="novo-valor-transporte" v-model.number="novoPacote.valor_transporte" type="number" step="0.01" @input="calcularSugeridoNovo" />
           </div>
           <div class="form-group">
-            <label>Valor Total Cobrado (R$)</label>
-            <input v-model.number="novoPacote.valor_cobrado" type="number" step="0.01" required style="font-weight: 800; background: var(--dourado-bg);" />
+            <label for="novo-valor-cobrado">Valor Total Cobrado (R$)</label>
+            <input id="novo-valor-cobrado" v-model.number="novoPacote.valor_cobrado" type="number" step="0.01" required style="font-weight: 800; background: var(--dourado-bg);" />
           </div>
           <div class="form-actions">
             <button type="button" @click="showNovoPacote = false" class="btn btn-cancelar">Cancelar</button>
@@ -135,7 +135,7 @@ const novoPacote = ref({
 })
 
 const cachorroId = computed(() => {
-  const id = parseInt(route.query.cachorro_id)
+  const id = Number.parseInt(route.query.cachorro_id, 10)
   if (id && !novoPacote.value.cachorro_id) novoPacote.value.cachorro_id = id
   return id || null
 })

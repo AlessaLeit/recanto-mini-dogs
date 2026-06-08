@@ -102,16 +102,16 @@
       <div class="modal" @click.stop>
         <h3 class="modal-title">Editar Status — {{ agEdit.pet_nome }}</h3>
         <div class="form-group">
-          <label>Status</label>
-          <select v-model="agEdit.status_presenca">
+          <label for="edit-status">Status</label>
+          <select id="edit-status" v-model="agEdit.status_presenca">
             <option value="pendente">🟡 Pendente</option>
             <option value="concluido">🟢 Concluído</option>
             <option value="faltou">🔴 Faltou</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Extras (JSON)</label>
-          <textarea v-model="agEdit.extras_str" rows="3" placeholder='{"observacao": "Banho extra"}'></textarea>
+          <label for="edit-extras">Extras (JSON)</label>
+          <textarea id="edit-extras" v-model="agEdit.extras_str" rows="3" placeholder='{"observacao": "Banho extra"}'></textarea>
           <small class="field-hint">Formato JSON simples</small>
         </div>
         <div class="modal-actions">

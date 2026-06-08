@@ -57,12 +57,13 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        VITE_API_URL: /api/v1
     image: alessaleit/pacotesbanho-frontend:latest
     container_name: petshop_frontend
     ports:
       - "80:80"
+    environment:
+      API_HOST: backend
+      NGINX_ENVSUBST_FILTERED_ARGS: '$$API_HOST'
     depends_on:
       backend:
         condition: service_healthy

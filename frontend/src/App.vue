@@ -234,7 +234,7 @@ body {
   color: var(--marrom);
   border-left: 5px solid var(--dourado);
   padding-left: 0.75rem;
-}
+} 
 
 /* ══ RESPONSIVO ══ */
 @media (max-width: 768px) {
@@ -245,7 +245,6 @@ body {
   }
 
   .navbar {
-    padding: 0 1rem;
     height: auto;
     flex-direction: column;
     gap: 0.75rem;

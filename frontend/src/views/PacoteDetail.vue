@@ -106,7 +106,10 @@
       <!-- Seção de Exclusão: Movida para o final do card de agendamentos -->
       <div class="footer-danger-zone">
         <button @click="confirmarDeletarPacote" class="btn btn-perigo" title="Excluir este pacote">🗑️ Excluir Pacote</button>
-        <button v-if="pacote?.status_pagamento === 'em_aberto'" @click="fecharPacote" class="btn btn-ghost" style="border-color: var(--dourado); color: var(--marrom);">🔒 Fechar Pacote</button>
+        <div class="footer-actions">
+          <button v-if="pacote?.status_pagamento === 'em_aberto'" @click="fecharPacote" class="btn btn-ghost" style="border-color: var(--dourado); color: var(--marrom);">🔒 Fechar Pacote</button>
+          <button v-if="pacote?.status_pagamento !== 'pago'" @click="abrirPagamento" class="btn btn-primario" style="margin-left: 0.5rem;">💰 Marcar como Pago</button>
+        </div>
       </div>
     <!-- ── MODAL: Editar Data ── -->
     <div class="modal" v-if="showEditData">
@@ -118,8 +121,8 @@
         </div>
         <p class="modal-info">Agendamento atual: <strong>{{ formatarData(agEditando?.data_banho) }}</strong></p>
         <div class="form-group">
-          <label>Selecione a Nova Data</label>
-          <input type="date" v-model="novaData" required />
+          <label for="nova-data">Selecione a Nova Data</label>
+          <input id="nova-data" type="date" v-model="novaData" required />
         </div>
         <div class="modal-actions">
           <button @click="showEditData = false" class="btn btn-cancelar">Cancelar</button>
@@ -155,16 +158,16 @@
 
         <div class="grid-form">
           <div class="form-group">
-            <label>Tipo de Plano</label>
-            <select v-model="formPacote.tipo_plano" @change="handleInputMudanca">
+            <label for="tipo-plano">Tipo de Plano</label>
+            <select id="tipo-plano" v-model="formPacote.tipo_plano" @change="handleInputMudanca">
               <option value="semanal">Semanal (4 banhos)</option>
               <option value="quinzenal">Quinzenal (2 banhos)</option>
               <option value="mensal">Mensal (1 banho)</option>
             </select>
           </div>
           <div class="form-group">
-            <label>Dia da Semana</label>
-            <select v-model="formPacote.dia_da_semana">
+            <label for="dia-semana">Dia da Semana</label>
+            <select id="dia-semana" v-model="formPacote.dia_da_semana">
               <option value="terca">Terça-feira</option>
               <option value="quarta">Quarta-feira</option>
               <option value="quinta">Quinta-feira</option>
@@ -176,18 +179,18 @@
 
         <div class="grid-form">
           <div class="form-group">
-            <label>Valor Base Banho (R$)</label>
-            <input type="number" step="0.01" v-model.number="formPacote.valor_banho_base" @input="handleInputMudanca" />
+            <label for="valor-base">Valor Base Banho (R$)</label>
+            <input id="valor-base" type="number" step="0.01" v-model.number="formPacote.valor_banho_base" @input="handleInputMudanca" />
           </div>
           <div class="form-group">
-            <label>Transporte Total (R$)</label>
-            <input type="number" step="0.01" v-model.number="formPacote.valor_transporte" @input="handleInputMudanca" />
+            <label for="transporte">Transporte Total (R$)</label>
+            <input id="transporte" type="number" step="0.01" v-model.number="formPacote.valor_transporte" @input="handleInputMudanca" />
           </div>
         </div>
 
         <div class="form-group form-highlight">
-          <label>Valor Total Cobrado (R$)</label>
-          <input type="number" step="0.01" v-model.number="formPacote.valor_cobrado" />
+          <label for="valor-cobrado">Valor Total Cobrado (R$)</label>
+          <input id="valor-cobrado" type="number" step="0.01" v-model.number="formPacote.valor_cobrado" />
           <small v-if="sugestaoVisivel" class="helper-text">
             Sugerido pelo plano: R$ {{ formatarValor(valorSugerido) }}
           </small>
@@ -209,20 +212,20 @@
           <p class="modal-sub">✨ {{ pacote?.pet_nome }}</p>
         </div>
         <div class="form-group">
-          <label>Status de Presença</label>
-          <select v-model="formExtras.status_presenca">
+          <label for="edit-status">Status de Presença</label>
+          <select id="edit-status" v-model="formExtras.status_presenca">
             <option value="pendente">🟡 PENDENTE</option>
             <option value="concluido">🟢 CONCLUÍDO</option>
             <option value="faltou">🔴 FALTOU / CANCELADO</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Itens Extra / Descrição</label>
-          <input v-model="formExtras.info" placeholder="Ex: Tosa higiênica, Shampoo especial..." />
+          <label for="edit-info">Itens Extra / Descrição</label>
+          <input id="edit-info" v-model="formExtras.info" placeholder="Ex: Tosa higiênica, Shampoo especial..." />
         </div>
         <div class="form-group">
-          <label>Valor Extra (R$)</label>
-          <input type="number" step="0.01" v-model.number="formExtras.valor_extra" />
+          <label for="edit-valor-extra">Valor Extra (R$)</label>
+          <input id="edit-valor-extra" type="number" step="0.01" v-model.number="formExtras.valor_extra" />
         </div>
         <div class="modal-actions">
           <button @click="showModalExtras = false" class="btn btn-cancelar">Cancelar</button>
@@ -241,12 +244,35 @@
         </div>
         <p class="modal-info">Adicione um banho avulso fora do cronograma do plano.</p>
         <div class="form-group">
-          <label>Data do Banho</label>
-          <input type="date" v-model="dataExtra" required />
+          <label for="data-extra">Data do Banho</label>
+          <input id="data-extra" type="date" v-model="dataExtra" required />
         </div>
         <div class="modal-actions">
           <button @click="showAddExtra = false" class="btn btn-cancelar">Cancelar</button>
           <button @click="salvarExtra" class="btn btn-primario" :disabled="!dataExtra">Adicionar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MODAL: Registrar Pagamento ── -->
+    <div class="modal" v-if="showModalPagamento">
+      <div class="modal-overlay" @click="showModalPagamento = false"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Registrar Pagamento</h3>
+          <p class="modal-sub">💰 {{ pacote?.pet_nome }}</p>
+        </div>
+        <div class="form-group">
+          <label for="pagamento-valor">Valor Pago (R$)</label>
+          <input id="pagamento-valor" type="number" step="0.01" v-model.number="formPagamento.valor_pago" />
+        </div>
+        <div class="form-group">
+          <label for="pagamento-data">Data do Pagamento</label>
+          <input id="pagamento-data" type="date" v-model="formPagamento.data_pagamento" />
+        </div>
+        <div class="modal-actions">
+          <button @click="showModalPagamento = false" class="btn btn-cancelar">Cancelar</button>
+          <button @click="confirmarPagamento" class="btn btn-primario">Confirmar Recebimento</button>
         </div>
       </div>
     </div>
@@ -290,6 +316,7 @@ const showConfirmRemove = ref(false)
 const showConfirmDeletePacote = ref(false)
 const showModalExtras = ref(false)
 const showModalEditPacote = ref(false)
+const showModalPagamento = ref(false)
 
 // Dados dos modais
 const agEditando = ref(null)
@@ -299,10 +326,11 @@ const agRemovendo = ref(null)
 const agExtras = ref(null)
 const formExtras = ref({ info: '', valor_extra: 0, status_presenca: 'pendente' })
 const formPacote = ref({ tipo_plano: '', dia_da_semana: '', valor_banho_base: 0, valor_cobrado: 0, valor_transporte: 0 })
+const formPagamento = ref({ valor_pago: 0, data_pagamento: '' })
 const valorSugerido = ref(0)
 const sugestaoVisivel = ref(false)
 
-const pacoteId = computed(() => parseInt(route.params.id))
+const pacoteId = computed(() => Number.parseInt(route.params.id, 10))
 
 const totalPacote = computed(() => {
   if (!pacote.value) return 0
@@ -366,6 +394,21 @@ async function fecharPacote() {
     await carregarPacote()
     alert('Pacote fechado com sucesso! Agora você pode registrar o pagamento.')
   } catch (err) { alert('Erro ao fechar pacote: ' + err) }
+}
+
+function abrirPagamento() {
+  formPagamento.value.valor_pago = pacote.value.valor_cobrado
+  formPagamento.value.data_pagamento = new Date().toISOString().split('T')[0]
+  showModalPagamento.value = true
+}
+
+async function confirmarPagamento() {
+  try {
+    await pacotesStore.registrarPagamento(pacoteId.value, formPagamento.value.valor_pago, formPagamento.value.data_pagamento)
+    showModalPagamento.value = false
+    await carregarPacote()
+    alert('Pagamento registrado com sucesso!')
+  } catch (err) { alert('Erro ao registrar pagamento: ' + err) }
 }
 
 function abrirEditarPacote() {
