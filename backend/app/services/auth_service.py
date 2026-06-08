@@ -39,7 +39,7 @@ class AuthService:
             email: str = payload.get("sub")
             if email is None:
                 raise HTTPException(
-                    status_code=status.HTTP_01_UNAUTHORIZED,
+                    status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Could not validate credentials",
                 )
             return email
