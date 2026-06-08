@@ -13,3 +13,11 @@ dist/
 
 *.db
 *.sqlite3
+
+# Testes e Cobertura
+.coverage
+htmlcov/
+
+# Configurações sensíveis de infra
+k8s/secret.yaml
+k8s/ingress.yaml
