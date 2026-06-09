@@ -14,13 +14,18 @@ spec:
       labels:
         app: frontend
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101 # UID padrão do usuário nginx no alpine
       automountServiceAccountToken: false
       containers:
       - name: frontend
         image: alessaleit/pacotesbanho-frontend:1.0.3
         imagePullPolicy: Never
         ports:
-        - containerPort: 80
+        - containerPort: 8080
+        securityContext:
+          allowPrivilegeEscalation: false
         resources:
             limits:
               memory: "256Mi"

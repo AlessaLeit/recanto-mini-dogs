@@ -60,7 +60,8 @@ services:
     image: alessaleit/pacotesbanho-frontend:latest
     container_name: petshop_frontend
     ports:
-      - "80:80"
+      # Mapeamos a porta 80 do host para a nova porta 8080 do container
+      - "80:8080"
     environment:
       API_HOST: backend
       NGINX_ENVSUBST_FILTERED_ARGS: '$$API_HOST'

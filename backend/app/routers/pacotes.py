@@ -79,125 +79,47 @@ def listar_pacotes(
 @router.post(
     "/",
     response_model=schemas.PacoteResponse,
-    status_code=status.HTTP_201_CREATED
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "Cachorro não encontrado ou inativo"},
+        status.HTTP_400_BAD_REQUEST: {"description": "Dados do plano inválidos"}
+    }
 )
 def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Annotated[Session, Depends(get_db)]):
     """Cria um novo pacote para um cachorro específico."""
-    # Verifica se o cachorro existe e é ativo
     cachorro = db.query(models.Cachorro).filter(
         models.Cachorro.id == pacote_criar.cachorro_id,
         models.Cachorro.ativo == True
     ).first()
+
     if not cachorro:
-        raise HTTPException(status_code=404, detail="Cachorro não encontrado ou inativo")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Cachorro não encontrado ou inativo"
+        )
     
-    # Cria o pacote
-    dados_pacote = pacote_criar.model_dump()
-    dados_pacote.pop('limite_banhos_mes', None)
-    dados_pacote.pop('status_pagamento', None)
+    # Prepara os dados omitindo campos calculados e garantindo padrões
+    dados = pacote_criar.model_dump(exclude={'limite_banhos_mes', 'status_pagamento'})
+    dados.update({
+        "dia_da_semana": dados.get("dia_da_semana") or "terca",
+        "fechado": False,
+        "ativo": True
+    })
     
-    # Garante que o dia da semana não seja nulo (correção IntegrityError)
-    if not dados_pacote.get('dia_da_semana'):
-        dados_pacote['dia_da_semana'] = pacote_criar.dia_da_semana or "terca"
-
-    # Garante valor padrão para campos novos caso não venham no schema
-    if 'fechado' not in dados_pacote:
-        dados_pacote['fechado'] = False
-
-    # Garante que o pacote seja criado como ativo explicitamente
-    if 'ativo' not in dados_pacote:
-        dados_pacote['ativo'] = True
-
-    db_pacote = models.Pacote(**dados_pacote)
+    db_pacote = models.Pacote(**dados)
     db.add(db_pacote)
+    db.flush()  # Obtém o ID para o relacionamento sem finalizar a transação
+    
+    _gerar_agendamentos_mes_atual(db, db_pacote) # Chama a função auxiliar
     db.commit()
-    db.refresh(db_pacote)
 
-    # ==============================================================
-    # Geração automática de agendamentos para o mês atual.
-    # Regra:
-    # - Semanal: 4 datas no mesmo dia da semana (dia_da_semana)
-    # - Quinzenal: 2 datas com intervalo de 15 dias a partir da 1ª ocorrência no mês
-    # - Mensal: 1 data (primeira ocorrência no mês)
-    # ==============================================================
-    from datetime import date, timedelta
-    import calendar
+    # Busca o objeto completo com relacionamentos para o retorno
+    pacote_final = db.query(models.Pacote).options(
+        joinedload(models.Pacote.agendamentos),
+        joinedload(models.Pacote.cachorro).joinedload(models.Cachorro.cliente)
+    ).filter(models.Pacote.id == db_pacote.id).first()
 
-
-    hoje = date.today()
-    primeiro_dia_mes = date(hoje.year, hoje.month, 1)
-    ultimo_dia_mes = date(hoje.year, hoje.month, calendar.monthrange(hoje.year, hoje.month)[1])
-
-    mapa_dow = {
-        "terca": 1,   # Segunda=0
-        "quarta": 2,
-        "quinta": 3,
-        "sexta": 4,
-        "sabado": 5,
-    }
-
-    alvo_dow = mapa_dow.get(db_pacote.dia_da_semana.value)
-    if alvo_dow is None:
-        raise HTTPException(status_code=400, detail="Dia da semana inválido")
-
-    def primeira_ocorrencia_no_mes() -> Optional[date]:
-        d = primeiro_dia_mes
-        while d <= ultimo_dia_mes:
-            if d.weekday() == alvo_dow:
-                return d
-            d += timedelta(days=1)
-        return None
-
-    primeira = primeira_ocorrencia_no_mes()
-    datas: List[date] = []
-
-    if db_pacote.tipo_plano.value == "semanal" and primeira:
-        datas = [primeira + timedelta(days=7 * i) for i in range(4)]
-    elif db_pacote.tipo_plano.value == "quinzenal" and primeira:
-        datas = [primeira + timedelta(days=15 * i) for i in range(2)]
-    elif db_pacote.tipo_plano.value == "mensal" and primeira:
-        datas = [primeira]
-
-    # Garante que todas datas estão dentro do mês (caso 'primeira' caia no fim do mês)
-    datas_validas = [d for d in datas if primeiro_dia_mes <= d <= ultimo_dia_mes]
-
-    # Import aqui para evitar dependência circular no carregamento.
-    from app.models import Agendamento
-
-    for d in datas_validas:
-        db_ag = Agendamento(
-
-            pacote_id=db_pacote.id,
-            data_banho=d,
-            status_presenca="pendente",
-            extras={},
-        )
-        db.add(db_ag)
-
-    db.commit()
-    db.refresh(db_pacote)
-
-    # Retorna pacote com agendamentos carregados (para a resposta do endpoint)
-    db_pacote = (
-        db.query(models.Pacote)
-        .options(
-            joinedload(models.Pacote.agendamentos),
-            joinedload(models.Pacote.cachorro).joinedload(models.Cachorro.cliente)
-        )
-        .filter(models.Pacote.id == db_pacote.id)
-        .first()
-    )
-
-    # Em alguns cenários o FastAPI/Pydantic não consegue serializar diretamente o
-    # modelo SQLAlchemy quando há tipos não-mapeados (ex.: relacionamento Agendamento).
-    # Então, retornamos explicitamente via dict compatível com PacoteResponse.
-    # Para o detalhe, a UI usa PacoteDetail.vue que espera agendamentos no payload.
-    # Para compatibilidade com a serialização Pydantic, retornamos somente campos escalares + agendamentos.
-    # (PacoteResponse.agendamentos é List[Any], então aceitamos dicts).
-    return schemas.PacoteResponse.model_validate(db_pacote).model_dump()
-
-
-
+    return schemas.PacoteResponse.model_validate(pacote_final).model_dump()
 @router.get(
     "/{pacote_id}",
     response_model=schemas.PacoteResponse,
