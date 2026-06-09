@@ -3,7 +3,6 @@
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import api from '../api/index.js'
 import { clienteApi } from '../api/clientes'
 import { cachorroApi } from '../api/cachorros'
 

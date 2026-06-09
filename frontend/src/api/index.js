@@ -30,16 +30,16 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     let message = 'Erro na requisição'
-    if (!error.response) {
-      message = 'Não foi possível conectar ao servidor. Verifique se o backend está rodando.'
-    } else {
+    if (error.response) {
       // Só redireciona se NÃO estivermos na página de login
-      if ((error.response.status === 401 || error.response.status === 403) && !window.location.pathname.includes('/login')) {
+      if ((error.response.status === 401 || error.response.status === 403) && !globalThis.location.pathname.includes('/login')) {
         localStorage.removeItem('token')
         localStorage.removeItem('user')
-        window.location.href = '/login'
+        globalThis.location.href = '/login'
       }
       message = error.response?.data?.detail || message
+    } else {
+      message = 'Não foi possível conectar ao servidor. Verifique se o backend está rodando.'
     }
     console.error('[API Error]', message, error.config?.method?.toUpperCase(), error.config?.url)
     return Promise.reject(error)

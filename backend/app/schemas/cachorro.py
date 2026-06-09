@@ -5,6 +5,8 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Literal
 from datetime import datetime
 
+EXAMPLE_RACA = "Golden Retriever"
+
 
 class CachorroBase(BaseModel):
     """Schema base para cachorro"""
@@ -20,7 +22,7 @@ class CachorroBase(BaseModel):
         json_schema_extra={
             "example": {
                 "nome": "Rex",
-                "raca": "Golden Retriever",
+                "raca": EXAMPLE_RACA,
                 "porte": "grande",
                 "observacoes": "Alergia a determinados shampoos"
             }
@@ -37,7 +39,7 @@ class CachorroCreate(CachorroBase):
             "example": {
                 "cliente_id": 1,
                 "nome": "Rex",
-                "raca": "Golden Retriever",
+                "raca": EXAMPLE_RACA,
                 "porte": "grande",
                 "observacoes": "Muito tranquilo durante o banho"
             }
@@ -73,7 +75,7 @@ class CachorroResponse(CachorroBase):
                 "id": 1,
                 "cliente_id": 1,
                 "nome": "Rex",
-                "raca": "Golden Retriever",
+                "raca": EXAMPLE_RACA,
                 "porte": "grande",
                 "observacoes": "Alergia a shampoos com perfume"
             }

@@ -40,7 +40,7 @@ export const useAuthStore = defineStore('auth', {
       
       // Limpa o estado e força o redirecionamento
       // window.location.href é preferível ao router.push no logout para limpar estados residuais de memória
-      window.location.href = '/login'
+      globalThis.location.href = '/login'
     }
   }
 })

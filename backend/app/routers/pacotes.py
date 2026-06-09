@@ -1,26 +1,65 @@
 """
 Router Pacotes - CRUD, pagamento, geração automática agend
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Path, Body
 from sqlalchemy.orm import Session, joinedload
-from typing import List, Any, Optional
+from typing import List, Any, Optional, Annotated, Dict
 
 from app.database import get_db
 from app import models, schemas
 from app.services.pacote_service import PacoteService
 from app.auth import get_current_user
 
+PACOTE_NOT_FOUND = "Pacote não encontrado"
+
 router = APIRouter(
     tags=["Pacotes"],
     redirect_slashes=True,
-    responses={status.HTTP_404_NOT_FOUND: {"description": "Pacote não encontrado"}},
+    responses={status.HTTP_404_NOT_FOUND: {"description": PACOTE_NOT_FOUND}},
     dependencies=[Depends(get_current_user)]
 )
 
+def _gerar_agendamentos_mes_atual(db: Session, db_pacote: models.Pacote):
+    """Gera agendamentos automáticos para o mês atual com base no plano."""
+    from datetime import date, timedelta
+    import calendar
+    from app.models import Agendamento
+
+    hoje = date.today()
+    primeiro_dia_mes = date(hoje.year, hoje.month, 1)
+    ultimo_dia_mes = date(hoje.year, hoje.month, calendar.monthrange(hoje.year, hoje.month)[1])
+
+    mapa_dow = {"terca": 1, "quarta": 2, "quinta": 3, "sexta": 4, "sabado": 5}
+    alvo_dow = mapa_dow.get(db_pacote.dia_da_semana.value)
+    if alvo_dow is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Dia da semana inválido")
+
+    d = primeiro_dia_mes
+    primeira = None
+    while d <= ultimo_dia_mes:
+        if d.weekday() == alvo_dow:
+            primeira = d
+            break
+        d += timedelta(days=1)
+
+    if not primeira:
+        return
+
+    datas: List[date] = []
+    if db_pacote.tipo_plano.value == "semanal":
+        datas = [primeira + timedelta(days=7 * i) for i in range(4)]
+    elif db_pacote.tipo_plano.value == "quinzenal":
+        datas = [primeira + timedelta(days=15 * i) for i in range(2)]
+    elif db_pacote.tipo_plano.value == "mensal":
+        datas = [primeira]
+
+    for d in [dt for dt in datas if primeiro_dia_mes <= dt <= ultimo_dia_mes]:
+        db.add(Agendamento(pacote_id=db_pacote.id, data_banho=d, status_presenca="pendente", extras={}))
+
 @router.get("/", response_model=List[schemas.PacoteResponse])
 def listar_pacotes(
-    incluir_inativos: bool = Query(False, description="Incluir pacotes inativos?"),
-    db: Session = Depends(get_db)
+    incluir_inativos: Annotated[bool, Query(description="Incluir pacotes inativos?")] = False,
+    db: Annotated[Session, Depends(get_db)] = None
 ):
     """Lista pacotes (ativos por padrão; usa incluir_inativos=true para todos)."""
     query = db.query(models.Pacote).options(
@@ -37,8 +76,12 @@ def listar_pacotes(
 
     return [schemas.PacoteResponse.model_validate(p).model_dump() for p in pacotes]
 
-@router.post("/", response_model=schemas.PacoteResponse, status_code=status.HTTP_201_CREATED)
-def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Session = Depends(get_db)):
+@router.post(
+    "/",
+    response_model=schemas.PacoteResponse,
+    status_code=status.HTTP_201_CREATED
+)
+def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Annotated[Session, Depends(get_db)]):
     """Cria um novo pacote para um cachorro específico."""
     # Verifica se o cachorro existe e é ativo
     cachorro = db.query(models.Cachorro).filter(
@@ -155,9 +198,12 @@ def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Session = Depends(get_d
 
 
 
-@router.get("/{pacote_id}", response_model=schemas.PacoteResponse)
-
-def obter_pacote(pacote_id: int, db: Session = Depends(get_db)):
+@router.get(
+    "/{pacote_id}",
+    response_model=schemas.PacoteResponse,
+    responses={status.HTTP_404_NOT_FOUND: {"description": PACOTE_NOT_FOUND}}
+)
+def obter_pacote(pacote_id: int, db: Annotated[Session, Depends(get_db)]):
     """Obtém detalhes de um pacote específico com agendamentos."""
     pacote = db.query(models.Pacote)\
         .options(
@@ -167,17 +213,23 @@ def obter_pacote(pacote_id: int, db: Session = Depends(get_db)):
         .filter(models.Pacote.id == pacote_id)\
         .first()
     if not pacote:
-        raise HTTPException(status_code=404, detail="Pacote não encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=PACOTE_NOT_FOUND)
     
     return schemas.PacoteResponse.model_validate(pacote).model_dump()
 
-
-@router.put("/{pacote_id}", response_model=schemas.PacoteResponse)
-def atualizar_pacote(pacote_id: int, pacote_atualizar: schemas.PacoteUpdate, db: Session = Depends(get_db)):
+@router.put(
+    "/{pacote_id}",
+    response_model=schemas.PacoteResponse
+)
+def atualizar_pacote(
+    pacote_id: Annotated[int, Path(description="ID do pacote")],
+    pacote_atualizar: Annotated[schemas.PacoteUpdate, Body(description="Dados para atualização")],
+    db: Annotated[Session, Depends(get_db)]
+):
     """Atualiza dados do pacote."""
     pacote = db.query(models.Pacote).filter(models.Pacote.id == pacote_id).first()
     if not pacote:
-        raise HTTPException(status_code=404, detail="Pacote não encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=PACOTE_NOT_FOUND)
     
     update_data = pacote_atualizar.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -188,8 +240,14 @@ def atualizar_pacote(pacote_id: int, pacote_atualizar: schemas.PacoteUpdate, db:
 
     return schemas.PacoteResponse.model_validate(pacote).model_dump()
 
-@router.patch("/{pacote_id}/fechar", response_model=schemas.PacoteResponse)
-def fechar_pacote(pacote_id: int, db: Session = Depends(get_db)):
+@router.patch(
+    "/{pacote_id}/fechar",
+    response_model=schemas.PacoteResponse,
+)
+def fechar_pacote(
+    pacote_id: Annotated[int, Path(description="ID do pacote")],
+    db: Annotated[Session, Depends(get_db)]
+):
     """Marca o pacote como fechado (ciclo concluído, aguardando acerto)."""
     pacote = db.query(models.Pacote).options(
         joinedload(models.Pacote.cachorro).joinedload(models.Cachorro.cliente),
@@ -197,18 +255,21 @@ def fechar_pacote(pacote_id: int, db: Session = Depends(get_db)):
     ).filter(models.Pacote.id == pacote_id).first()
 
     if not pacote:
-        raise HTTPException(status_code=404, detail="Pacote não encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=PACOTE_NOT_FOUND)
     
     pacote.fechado = True
     db.commit()
     db.refresh(pacote)
     return schemas.PacoteResponse.model_validate(pacote).model_dump()
 
-@router.delete("/{pacote_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{pacote_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
 def deletar_pacote(
-    pacote_id: int, 
-    force: bool = Query(False, description="Se True, remove permanentemente do banco"),
-    db: Session = Depends(get_db)
+    pacote_id: Annotated[int, Path(description="ID do pacote")], 
+    force: Annotated[bool, Query(description="Se True, remove permanentemente do banco")] = False,
+    db: Annotated[Session, Depends(get_db)] = None
 ):
     """
     Remove pacote. 
@@ -217,7 +278,7 @@ def deletar_pacote(
     """
     pacote = db.query(models.Pacote).filter(models.Pacote.id == pacote_id).first()
     if not pacote:
-        raise HTTPException(status_code=404, detail="Pacote não encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=PACOTE_NOT_FOUND)
 
     if force:
         db.delete(pacote)
@@ -232,12 +293,12 @@ def deletar_pacote(
     db.commit()
     return None
 
-@router.patch("/{pacote_id}/pagar", response_model=dict)
+@router.patch("/{pacote_id}/pagar", response_model=Dict[str, Any])
 def registrar_pagamento(
-    pacote_id: int,
-    valor_pago: float,
-    data_pagamento: str,  # YYYY-MM-DD
-    db: Session = Depends(get_db)
+    pacote_id: Annotated[int, Path(description="ID do pacote")],
+    valor_pago: Annotated[float, Query(description="Valor efetivamente pago")],
+    data_pagamento: Annotated[str, Query(description="Data do pagamento (YYYY-MM-DD)")],
+    db: Annotated[Session, Depends(get_db)] = None
 ):
     """Registra pagamento de um pacote usando o serviço."""
     service = PacoteService(db)
@@ -247,7 +308,10 @@ def registrar_pagamento(
     return result
 
 @router.get("/{pacote_id}/agendamentos", response_model=List[schemas.AgendamentoResponse])
-def listar_agendamentos_pacote(pacote_id: int, db: Session = Depends(get_db)):
+def listar_agendamentos_pacote(
+    pacote_id: Annotated[int, Path(description="ID do pacote")],
+    db: Annotated[Session, Depends(get_db)]
+):
     """Lista agendamentos vinculados a um pacote específico."""
     agendamentos = db.query(models.Agendamento).filter(
         models.Agendamento.pacote_id == pacote_id
@@ -256,9 +320,9 @@ def listar_agendamentos_pacote(pacote_id: int, db: Session = Depends(get_db)):
 
 @router.post("/{pacote_id}/agendamento-extra", response_model=schemas.AgendamentoResponse)
 def adicionar_agendamento_extra(
-    pacote_id: int, 
-    data_banho: str, 
-    db: Session = Depends(get_db)
+    pacote_id: Annotated[int, Path(description="ID do pacote")], 
+    data_banho: Annotated[str, Query(description="Data do banho extra (YYYY-MM-DD)")], 
+    db: Annotated[Session, Depends(get_db)] = None
 ):
     """Cria um agendamento extra sem validar o limite do plano."""
     from datetime import date

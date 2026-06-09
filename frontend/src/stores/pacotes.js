@@ -125,7 +125,7 @@ export const usePacotesStore = defineStore('pacotes', () => {
     try {
       const response = await pacoteApi.atualizarDataAgendamento(id, data_banho)
       // Atualiza localmente se pacoteAtual estiver carregado
-      if (pacoteAtual.value && pacoteAtual.value.agendamentos) {
+      if (pacoteAtual.value?.agendamentos) {
         const idx = pacoteAtual.value.agendamentos.findIndex(a => a.id === id)
         if (idx > -1) {
           pacoteAtual.value.agendamentos[idx] = { 
@@ -150,7 +150,7 @@ export const usePacotesStore = defineStore('pacotes', () => {
     try {
       await pacoteApi.deletarAgendamento(id)
       // Remove localmente
-      if (pacoteAtual.value && pacoteAtual.value.agendamentos) {
+      if (pacoteAtual.value?.agendamentos) {
         pacoteAtual.value.agendamentos = pacoteAtual.value.agendamentos.filter(a => a.id !== id)
         pacoteAtual.value.total_agendamentos = pacoteAtual.value.agendamentos.length
       }
@@ -165,7 +165,7 @@ export const usePacotesStore = defineStore('pacotes', () => {
     try {
       const response = await pacoteApi.adicionarAgendamentoExtra(pacoteId, data_banho)
       // Adiciona localmente
-      if (pacoteAtual.value && pacoteAtual.value.agendamentos) {
+      if (pacoteAtual.value?.agendamentos) {
         pacoteAtual.value.agendamentos.push(response.data)
         // Reordena por data
         pacoteAtual.value.agendamentos.sort((a, b) => 
@@ -183,7 +183,7 @@ export const usePacotesStore = defineStore('pacotes', () => {
   async function updateAgendamento(id, data) {
     try {
       const response = await pacoteApi.atualizarAgendamento(id, data)
-      if (pacoteAtual.value && pacoteAtual.value.agendamentos) {
+      if (pacoteAtual.value?.agendamentos) {
         const idx = pacoteAtual.value.agendamentos.findIndex(a => a.id === id)
         if (idx > -1) {
           // Update com novos totais se vierem da API

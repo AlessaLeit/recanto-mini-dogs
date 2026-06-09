@@ -6,6 +6,9 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 
+EXAMPLE_NOME = "Maria Silva"
+EXAMPLE_TELEFONE = "(11) 98765-4321"
+
 
 class ClienteBase(BaseModel):
     """Schema base com campos comuns"""
@@ -16,8 +19,8 @@ class ClienteBase(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "nome": "Maria Silva",
-                "telefone": "(11) 98765-4321",
+                "nome": EXAMPLE_NOME,
+                "telefone": EXAMPLE_TELEFONE,
                 "endereco": "Rua das Flores, 123 - São Paulo/SP"
             }
         }
@@ -54,8 +57,8 @@ class ClienteResponse(ClienteBase):
         json_schema_extra={
             "example": {
                 "id": 1,
-                "nome": "Maria Silva",
-                "telefone": "(11) 98765-4321",
+                "nome": EXAMPLE_NOME,
+                "telefone": EXAMPLE_TELEFONE,
                 "endereco": "Rua das Flores, 123 - São Paulo/SP",
                 "criado_em": "2024-01-15T10:30:00"
             }
@@ -83,8 +86,8 @@ class ClienteWithCachorros(ClienteResponse):
         json_schema_extra={
             "example": {
                 "id": 1,
-                "nome": "Maria Silva",
-                "telefone": "(11) 98765-4321",
+                "nome": EXAMPLE_NOME,
+                "telefone": EXAMPLE_TELEFONE,
                 "endereco": "Rua das Flores, 123",
                 "criado_em": "2024-01-15T10:30:00",
                 "cachorros": [

@@ -157,7 +157,13 @@ const pacotesFiltrados = computed(() => {
 })
 
 function calcularSugeridoNovo() {
-  const qtd = novoPacote.value.tipo_plano === 'semanal' ? 4 : (novoPacote.value.tipo_plano === 'quinzenal' ? 2 : 1)
+  let qtd = 1
+  if (novoPacote.value.tipo_plano === 'semanal') {
+    qtd = 4
+  } else if (novoPacote.value.tipo_plano === 'quinzenal') {
+    qtd = 2
+  }
+
   const base = novoPacote.value.valor_banho_base || 0
   const transporte = novoPacote.value.valor_transporte || 0
   

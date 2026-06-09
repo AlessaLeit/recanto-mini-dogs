@@ -350,6 +350,8 @@ async function carregarPacote() {
     pacote.value = data
     agendamentos.value = data.agendamentos || []
   } catch (err) {
+    console.error('Erro ao carregar pacote:', err)
+    alert('Erro ao carregar os dados do pacote. Por favor, tente novamente.')
   } finally {
     loading.value = false
   }
@@ -384,7 +386,10 @@ async function salvarNovaData() {
     showEditData.value = false
     agEditando.value = null
     novaData.value = ''
-  } catch (err) {}
+  } catch (err) {
+    console.error('Erro ao salvar nova data:', err)
+    alert('Erro ao atualizar a data do agendamento.')
+  }
 }
 
 async function fecharPacote() {
@@ -421,7 +426,13 @@ function abrirEditarPacote() {
   }
   
   // Define o valor sugerido apenas como referência inicial sem alterar o valor_cobrado salvo
-  const qtd = formPacote.value.tipo_plano === 'semanal' ? 4 : (formPacote.value.tipo_plano === 'quinzenal' ? 2 : 1)
+  let qtd = 1
+  if (formPacote.value.tipo_plano === 'semanal') {
+    qtd = 4
+  } else if (formPacote.value.tipo_plano === 'quinzenal') {
+    qtd = 2
+  }
+
   valorSugerido.value = (formPacote.value.valor_banho_base * qtd) + formPacote.value.valor_transporte
   sugestaoVisivel.value = true
   showModalEditPacote.value = true
@@ -432,7 +443,13 @@ function handleInputMudanca() {
 }
 
 function recalcularSugerido() {
-  const qtd = formPacote.value.tipo_plano === 'semanal' ? 4 : (formPacote.value.tipo_plano === 'quinzenal' ? 2 : 1)
+  let qtd = 1
+  if (formPacote.value.tipo_plano === 'semanal') {
+    qtd = 4
+  } else if (formPacote.value.tipo_plano === 'quinzenal') {
+    qtd = 2
+  }
+
   const valorBase = formPacote.value.valor_banho_base || 0
   const transporte = formPacote.value.valor_transporte || 0
   
@@ -471,7 +488,10 @@ async function salvarExtras() {
     })
     showModalExtras.value = false
     await carregarPacote()
-  } catch (err) {}
+  } catch (err) {
+    console.error('Erro ao salvar extras:', err)
+    alert('Erro ao salvar os extras/observações do agendamento.')
+  }
 }
 
 async function salvarExtra() {
@@ -480,7 +500,10 @@ async function salvarExtra() {
     await pacotesStore.adicionarExtra(pacoteId.value, dataExtra.value)
     showAddExtra.value = false
     dataExtra.value = ''
-  } catch (err) {}
+  } catch (err) {
+    console.error('Erro ao adicionar banho extra:', err)
+    alert('Erro ao adicionar o banho extra.')
+  }
 }
 
 function confirmarRemover(ag) {
@@ -508,7 +531,10 @@ async function executarRemover() {
     await pacotesStore.removerAgendamento(agRemovendo.value.id)
     showConfirmRemove.value = false
     agRemovendo.value = null
-  } catch (err) {}
+  } catch (err) {
+    console.error('Erro ao remover agendamento:', err)
+    alert('Erro ao remover o agendamento selecionado.')
+  }
 }
 
 onMounted(carregarPacote)

@@ -3,23 +3,30 @@ Router Cachorros - CRUD e listagem com histórico de pacotes.
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
-from typing import List, Optional
+from typing import List, Optional, Annotated
 from app.database import get_db
 from app.models import Cachorro, Cliente
 from app.schemas import CachorroCreate, CachorroUpdate, CachorroResponse, CachorroWithPacotes
 
+CACHORRO_NOT_FOUND = "Cachorro não encontrado"
+
 router = APIRouter(tags=["Cachorros"], redirect_slashes=True)
 
 
-@router.post("/", response_model=CachorroResponse, status_code=status.HTTP_201_CREATED)
-def criar_cachorro(cachorro: CachorroCreate, db: Session = Depends(get_db)):
+@router.post(
+    "/",
+    response_model=CachorroResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Cliente não encontrado"}}
+)
+def criar_cachorro(cachorro: CachorroCreate, db: Annotated[Session, Depends(get_db)]):
     """
     Cria um novo cachorro vinculado a um cliente existente.
     """
     # Verifica se cliente existe
     cliente = db.query(Cliente).filter(Cliente.id == cachorro.cliente_id).first()
     if not cliente:
-        raise HTTPException(status_code=404, detail="Cliente não encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado")
     
     db_cachorro = Cachorro(**cachorro.model_dump())
     db.add(db_cachorro)
@@ -30,11 +37,11 @@ def criar_cachorro(cachorro: CachorroCreate, db: Session = Depends(get_db)):
 
 @router.get("/", response_model=List[CachorroResponse])
 def listar_cachorros(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    cliente_id: Optional[int] = Query(None, description="Filtrar por cliente"),
-    porte: Optional[str] = Query(None, description="Filtrar por porte: pequeno, medio, grande"),
-    db: Session = Depends(get_db)
+    skip: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+    cliente_id: Annotated[Optional[int], Query(description="Filtrar por cliente")] = None,
+    porte: Annotated[Optional[str], Query(description="Filtrar por porte: pequeno, medio, grande")] = None,
+    db: Annotated[Session, Depends(get_db)] = None
 ):
     """
     Lista cachorros com filtros opcionais por cliente e porte.
@@ -50,8 +57,12 @@ def listar_cachorros(
     return [CachorroResponse.model_validate(c).model_dump() for c in cachorros]
 
 
-@router.get("/{cachorro_id}", response_model=CachorroWithPacotes)
-def obter_cachorro(cachorro_id: int, db: Session = Depends(get_db)):
+@router.get(
+    "/{cachorro_id}",
+    response_model=CachorroWithPacotes,
+    responses={status.HTTP_404_NOT_FOUND: {"description": CACHORRO_NOT_FOUND}}
+)
+def obter_cachorro(cachorro_id: int, db: Annotated[Session, Depends(get_db)]):
     """
     Obtém detalhes do cachorro incluindo histórico de pacotes.
     """
@@ -60,23 +71,27 @@ def obter_cachorro(cachorro_id: int, db: Session = Depends(get_db)):
     ).filter(Cachorro.id == cachorro_id).first()
     
     if not cachorro:
-        raise HTTPException(status_code=404, detail="Cachorro não encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=CACHORRO_NOT_FOUND)
     
     return CachorroWithPacotes.model_validate(cachorro).model_dump()
 
 
-@router.put("/{cachorro_id}", response_model=CachorroResponse)
+@router.put(
+    "/{cachorro_id}",
+    response_model=CachorroResponse,
+    responses={status.HTTP_404_NOT_FOUND: {"description": CACHORRO_NOT_FOUND}}
+)
 def atualizar_cachorro(
     cachorro_id: int,
     cachorro_update: CachorroUpdate,
-    db: Session = Depends(get_db)
+    db: Annotated[Session, Depends(get_db)]
 ):
     """
     Atualiza dados do cachorro.
     """
     db_cachorro = db.query(Cachorro).filter(Cachorro.id == cachorro_id).first()
     if not db_cachorro:
-        raise HTTPException(status_code=404, detail="Cachorro não encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=CACHORRO_NOT_FOUND)
     
     update_data = cachorro_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -87,14 +102,18 @@ def atualizar_cachorro(
     return CachorroResponse.model_validate(db_cachorro).model_dump()
 
 
-@router.delete("/{cachorro_id}", status_code=status.HTTP_204_NO_CONTENT)
-def deletar_cachorro(cachorro_id: int, db: Session = Depends(get_db)):
+@router.delete(
+    "/{cachorro_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={status.HTTP_404_NOT_FOUND: {"description": CACHORRO_NOT_FOUND}}
+)
+def deletar_cachorro(cachorro_id: int, db: Annotated[Session, Depends(get_db)]):
     """
     Remove um cachorro e todos os seus pacotes/banhos.
     """
     db_cachorro = db.query(Cachorro).filter(Cachorro.id == cachorro_id).first()
     if not db_cachorro:
-        raise HTTPException(status_code=404, detail="Cachorro não encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=CACHORRO_NOT_FOUND)
     
     db.delete(db_cachorro)
     db.commit()

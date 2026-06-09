@@ -6,7 +6,7 @@ Imports corrigidos, tables checkfirst, JSON frontend.
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Annotated
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, Date, ForeignKey, DateTime, func
 from sqlalchemy.orm import sessionmaker, Session, declarative_base, relationship
 from sqlalchemy.pool import StaticPool
@@ -101,7 +101,7 @@ app.add_middleware(
 
 # ENDPOINTS CLIENTES
 @app.post("/api/v1/clientes/")
-def criar_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
+def criar_cliente(cliente: ClienteCreate, db: Annotated[Session, Depends(get_db)]):
     db_cliente = Cliente(**cliente.model_dump())
     db.add(db_cliente)
     db.commit()
@@ -109,21 +109,26 @@ def criar_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
     return to_dict(db_cliente)
 
 @app.get("/api/v1/clientes/")
-def listar_clientes(busca: Optional[str] = Query(None), skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def listar_clientes(
+    busca: Annotated[Optional[str], Query()] = None,
+    skip: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 100,
+    db: Annotated[Session, Depends(get_db)] = None
+):
     query = db.query(Cliente)
     if busca:
         query = query.filter(Cliente.nome.ilike(f"%{busca}%"))
     return [to_dict(c) for c in query.offset(skip).limit(limit).all()]
 
-@app.get("/api/v1/clientes/{cliente_id}")
-def get_cliente(cliente_id: int, db: Session = Depends(get_db)):
+@app.get("/api/v1/clientes/{cliente_id}", responses={404: {"description": "Cliente não encontrado"}})
+def get_cliente(cliente_id: int, db: Annotated[Session, Depends(get_db)]):
     c = db.query(Cliente).get(cliente_id)
     if not c:
         raise HTTPException(404, "Cliente não encontrado")
     return to_dict(c)
 
-@app.put("/api/v1/clientes/{cliente_id}")
-def update_cliente(cliente_id: int, data: dict, db: Session = Depends(get_db)):
+@app.put("/api/v1/clientes/{cliente_id}", responses={404: {"description": "Cliente não encontrado"}})
+def update_cliente(cliente_id: int, data: dict, db: Annotated[Session, Depends(get_db)]):
     c = db.query(Cliente).get(cliente_id)
     if not c:
         raise HTTPException(404)
@@ -133,8 +138,8 @@ def update_cliente(cliente_id: int, data: dict, db: Session = Depends(get_db)):
     db.refresh(c)
     return to_dict(c)
 
-@app.delete("/api/v1/clientes/{cliente_id}")
-def delete_cliente(cliente_id: int, db: Session = Depends(get_db)):
+@app.delete("/api/v1/clientes/{cliente_id}", responses={404: {"description": "Cliente não encontrado"}})
+def delete_cliente(cliente_id: int, db: Annotated[Session, Depends(get_db)]):
     c = db.query(Cliente).get(cliente_id)
     if not c:
         raise HTTPException(404)
@@ -143,8 +148,8 @@ def delete_cliente(cliente_id: int, db: Session = Depends(get_db)):
     return {"deleted": True}
 
 # PACOTES
-@app.post("/api/v1/pacotes/")
-def criar_pacote(p: PacoteCreate, db: Session = Depends(get_db)):
+@app.post("/api/v1/pacotes/", responses={404: {"description": "Cachorro não encontrado"}})
+def criar_pacote(p: PacoteCreate, db: Annotated[Session, Depends(get_db)]):
     cachorro = db.query(Cachorro).get(p.cachorro_id)
     if not cachorro:
         raise HTTPException(404, "Crie cachorro primeiro")
@@ -155,21 +160,21 @@ def criar_pacote(p: PacoteCreate, db: Session = Depends(get_db)):
     return to_dict(db_p)
 
 @app.get("/api/v1/pacotes/")
-def listar_pacotes(ativo: Optional[bool] = Query(True), db: Session = Depends(get_db)):
+def listar_pacotes(ativo: Annotated[Optional[bool], Query()] = True, db: Annotated[Session, Depends(get_db)] = None):
     query = db.query(Pacote)
     if ativo is not None:
         query = query.filter(Pacote.ativo == ativo)
     return [to_dict(p) for p in query.all()]
 
-@app.get("/api/v1/pacotes/{pacote_id}")
-def get_pacote(pacote_id: int, db: Session = Depends(get_db)):
+@app.get("/api/v1/pacotes/{pacote_id}", responses={404: {"description": "Pacote não encontrado"}})
+def get_pacote(pacote_id: int, db: Annotated[Session, Depends(get_db)]):
     p = db.query(Pacote).get(pacote_id)
     if not p:
         raise HTTPException(404)
     return to_dict(p)
 
-@app.put("/api/v1/pacotes/{pacote_id}")
-def update_pacote(pacote_id: int, data: dict, db: Session = Depends(get_db)):
+@app.put("/api/v1/pacotes/{pacote_id}", responses={404: {"description": "Pacote não encontrado"}})
+def update_pacote(pacote_id: int, data: dict, db: Annotated[Session, Depends(get_db)]):
     p = db.query(Pacote).get(pacote_id)
     if not p:
         raise HTTPException(404)
@@ -179,8 +184,13 @@ def update_pacote(pacote_id: int, data: dict, db: Session = Depends(get_db)):
     db.refresh(p)
     return to_dict(p)
 
-@app.post("/api/v1/pacotes/{pacote_id}/pagar")
-def pagar_pacote(pacote_id: int, valor_pago: float, data_pagamento: str, db: Session = Depends(get_db)):
+@app.post("/api/v1/pacotes/{pacote_id}/pagar", responses={404: {"description": "Pacote não encontrado"}})
+def pagar_pacote(
+    pacote_id: int,
+    valor_pago: float,
+    data_pagamento: str,
+    db: Annotated[Session, Depends(get_db)]
+):
     p = db.query(Pacote).get(pacote_id)
     if not p:
         raise HTTPException(404)
@@ -190,8 +200,8 @@ def pagar_pacote(pacote_id: int, valor_pago: float, data_pagamento: str, db: Ses
     db.refresh(p)
     return to_dict(p)
 
-@app.delete("/api/v1/pacotes/{pacote_id}")
-def delete_pacote(pacote_id: int, db: Session = Depends(get_db)):
+@app.delete("/api/v1/pacotes/{pacote_id}", responses={404: {"description": "Pacote não encontrado"}})
+def delete_pacote(pacote_id: int, db: Annotated[Session, Depends(get_db)]):
     p = db.query(Pacote).get(pacote_id)
     if not p:
         raise HTTPException(404)
@@ -204,4 +214,3 @@ def root():
     return {"status": "OK", "docs": "/docs"}
 
 print("Backend simplificado carregado! http://localhost:8000/docs")
-

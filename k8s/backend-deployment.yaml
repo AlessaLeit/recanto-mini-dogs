@@ -29,41 +29,14 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "500m"
+              ephemeral-storage: "1Gi"
             requests:
               memory: "256Mi"
               cpu: "250m"
+              ephemeral-storage: "512Mi"
 
           envFrom:
             - configMapRef:
                 name: app-config
-
-          env:
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: app-secret
-                  key: DB_PASSWORD
-
-            - name: DB_USER
-              valueFrom:
-                secretKeyRef:
-                  name: app-secret
-                  key: DB_USER
-
-            - name: DB_NAME
-              valueFrom:
-                secretKeyRef:
-                  name: app-secret
-                  key: DB_NAME
-
-            - name: ADMIN_EMAIL
-              valueFrom:
-                secretKeyRef:
-                  name: app-secret
-                  key: ADMIN_EMAIL
-
-            - name: ADMIN_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: app-secret
-                  key: ADMIN_PASSWORD
+            - secretRef:
+                name: app-secret

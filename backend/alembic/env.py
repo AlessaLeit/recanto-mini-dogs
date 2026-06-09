@@ -12,7 +12,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from app.database import Base, settings
-from app.models import *  # Importa todos os modelos
+import app.models  # Importa o módulo para garantir o registro dos modelos no Base.metadata
 
 # Configuração do Alembic
 config = context.config
