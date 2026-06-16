@@ -62,7 +62,7 @@ def listar_banhos(
     responses={status.HTTP_404_NOT_FOUND: {"description": BANHO_NOT_FOUND}}
 )
 def obter_banho(
-    banho_id: Annotated[int, Query(description="ID do banho")],
+    banho_id: int,
     db: Annotated[Session, Depends(get_db)]
 ):
     """

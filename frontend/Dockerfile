@@ -18,6 +18,7 @@ RUN touch /var/run/nginx.pid && \
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build-stage --chown=nginx:nginx /app/dist /usr/share/nginx/html
+COPY --from=build-stage --chown=nginx:nginx --chmod=555 /app/dist /usr/share/nginx/html
 
 USER nginx
 
