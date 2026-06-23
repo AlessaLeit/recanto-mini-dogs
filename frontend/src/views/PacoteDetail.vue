@@ -64,24 +64,24 @@
         <thead>
           <tr>
             <th>Data</th>
-            <th>Valor Banho</th>
-            <th>Itens Extra</th>
-            <th>Valor Extra</th>
             <th>Status</th>
+            <th>Itens Extras</th>
+            <th>Valor Banho</th>
+            <th>Valor Extra</th>
             <th>Ações</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="ag in agendamentos" :key="ag.id" :class="ag.status_presenca">
             <td><strong>{{ formatarData(ag.data_banho) }}</strong></td>
-            <td>R$ {{ formatarValor(pacote?.valor_banho_base || 0) }}</td>
-            <td class="clickable-cell" @click="abrirEditarExtras(ag)">{{ ag.extras?.info || '-' }}</td>
-            <td class="clickable-cell" @click="abrirEditarExtras(ag)">R$ {{ formatarValor(ag.extras?.valor_extra || 0) }}</td>
             <td class="clickable-cell" @click="abrirEditarExtras(ag)">
               <span class="status-badge" :class="ag.status_presenca">
                 {{ ag.status_presenca?.toUpperCase() }}
               </span>
             </td>
+            <td class="clickable-cell" @click="abrirEditarExtras(ag)">{{ ag.extras?.info || '-' }}</td>
+            <td>R$ {{ formatarValor(pacote?.valor_banho_base || 0) }}</td>
+            <td class="clickable-cell" @click="abrirEditarExtras(ag)">R$ {{ formatarValor(ag.extras?.valor_extra || 0) }}</td>
             <td>
               <div class="acoes">
                 <button @click="abrirEditarExtras(ag)" class="btn-acao btn-acao-verde" title="Adicionar Item Extra">+</button>
@@ -337,9 +337,16 @@ const totalPacote = computed(() => {
   const valorBase = pacote.value.valor_banho_base || 0
   const transporte = pacote.value.valor_transporte || 0
   const agendamentosTotal = agendamentos.value.reduce((sum, ag) => {
-    const valorExtra = ag.extras?.valor_extra || 0
-    return sum + valorBase + valorExtra
+    const concluido = ag.status_presenca === 'concluido'
+
+    // Regra: só soma banho base e extras quando o agendamento estiver CONCLUÍDO.
+    const valorBanhoSomado = concluido ? valorBase : 0
+    const valorExtraSomado = concluido ? (ag.extras?.valor_extra || 0) : 0
+
+    return sum + valorBanhoSomado + valorExtraSomado
   }, 0)
+
+  // Transporte é fixo do mês/roteiro, então sempre soma.
   return agendamentosTotal + transporte
 })
 
