@@ -367,6 +367,7 @@ onMounted(async () => {
 .periodo-filtro {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 .periodo-filtro label {
@@ -376,14 +377,21 @@ onMounted(async () => {
 }
 .periodo-filtro select,
 .periodo-filtro .periodo-data {
-  padding: 6px 10px;
+  padding: 0.5rem 0.75rem;
   border: 2px solid var(--creme-escuro);
-  border-radius: 6px;
+  border-radius: 7px;
   font-size: 0.85rem;
-  color: var(--text);
-  background: var(--white);
+  font-weight: 700;
+  color: var(--marrom);
+  background: var(--creme);
+  transition: border-color 0.15s;
 }
-.periodo-ate { font-size: 0.85rem; color: var(--text-muted); }
+.periodo-filtro select:focus,
+.periodo-filtro .periodo-data:focus {
+  border-color: var(--dourado);
+  outline: none;
+}
+.periodo-ate { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; }
 
 /* STATS */
 .stats-grid {
@@ -441,6 +449,8 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
   margin-bottom: 1rem;
 }
 
@@ -448,15 +458,22 @@ onMounted(async () => {
 .ag-header-actions {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
   gap: 0.6rem;
 }
 .select-turno {
-  padding: 6px 10px;
-  border: 1px solid var(--creme-escuro);
-  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  border: 2px solid var(--creme-escuro);
+  border-radius: 7px;
   font-size: 0.85rem;
+  font-weight: 700;
   color: var(--marrom);
-  background: var(--white);
+  background: var(--creme);
+  transition: border-color 0.15s;
+}
+.select-turno:focus {
+  border-color: var(--dourado);
+  outline: none;
 }
 
 /* BOTÃO REFRESH */
