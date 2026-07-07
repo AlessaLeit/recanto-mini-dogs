@@ -11,6 +11,9 @@ class AgendamentoBase(BaseModel):
     status_presenca: Literal["pendente", "concluido", "faltou"] = Field(
         default="pendente", description="Status: pendente, concluido ou faltou"
     )
+    turno: Literal["manha", "tarde"] = Field(
+        default="manha", description="Turno do banho: manha ou tarde"
+    )
     extras: Optional[Dict[str, Any]] = Field(
         default_factory=dict, description="Extras JSON (remedio, produtos etc.)"
     )
@@ -20,6 +23,7 @@ class AgendamentoBase(BaseModel):
             "example": {
                 "data_banho": "2024-03-15",
                 "status_presenca": "concluido",
+                "turno": "manha",
                 "extras": {"remedio": "antipulgas", "observacao": "comportamento agitado"}
             }
         }
@@ -41,6 +45,7 @@ class AgendamentoCreate(AgendamentoBase):
 class AgendamentoUpdate(BaseModel):
     "Schema para edição (retroativa permitida)"
     status_presenca: Optional[Literal["pendente", "concluido", "faltou"]] = None
+    turno: Optional[Literal["manha", "tarde"]] = None
     extras: Optional[Dict[str, Any]] = None
 
     model_config = ConfigDict(

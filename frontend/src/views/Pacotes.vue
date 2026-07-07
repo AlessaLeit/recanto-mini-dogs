@@ -24,6 +24,8 @@
       <select v-model="filtroPagamento" class="filter-select" aria-label="Filtrar por status de pagamento">
         <option value="todos">Todos os Status</option>
         <option value="em_aberto">Em Aberto</option>
+        <option value="parcial">Parcial</option>
+        <option value="atrasado">Atrasado</option>
         <option value="fechado">Fechado (Aguardando)</option>
         <option value="pago">Pago</option>
       </select>
@@ -168,7 +170,12 @@ function voltarTodosPacotes() { router.push('/pacotes') }
 function abrirPagamento(pacote) { pacoteSelecionado.value = pacote; showPagamento.value = true }
 async function confirmarPagamento(dados) {
   try {
-    await pacotesStore.registrarPagamento(dados.pacote_id, dados.valor_pago, dados.data_pagamento)
+    await pacotesStore.registrarPagamento(dados.pacote_id, {
+      valor_pago: dados.valor_pago,
+      data_pagamento: dados.data_pagamento,
+      tipo_pagamento: 'pix',
+      fechar_pacote: false
+    })
     showPagamento.value = false
     alert('Pagamento registrado com sucesso!')
   } catch (err) { alert('Erro: ' + err) }

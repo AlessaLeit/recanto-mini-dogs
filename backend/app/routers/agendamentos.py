@@ -2,9 +2,9 @@
 Router Agendamentos - CRUD básico e edição status/extras.
 Integra com pacote_service para validações.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from app.database import get_db
 from app.models import Agendamento
 from app.schemas import AgendamentoCreate, AgendamentoUpdate, AgendamentoResponse
@@ -39,7 +39,11 @@ def listar_agendamentos(pacote_id: int, db: Session = Depends(get_db)):
     return agendamentos
 
 @router.get("/dashboard/{data}")
-def listar_agendamentos_data(data: str, db: Session = Depends(get_db)):
+def listar_agendamentos_data(
+    data: str,
+    turno: Optional[str] = Query(None, description="Filtra por turno: manha ou tarde"),
+    db: Session = Depends(get_db)
+):
     """
     Lista agendamentos de data específica (YYYY-MM-DD) para dashboard.
     Default: hoje se inválida. Inclui pet.nome, cliente.nome, pacote.id.
@@ -49,13 +53,16 @@ def listar_agendamentos_data(data: str, db: Session = Depends(get_db)):
     except ValueError:
         target_date = date.today()
 
-    agendamentos = (db.query(Agendamento)
+    query = (db.query(Agendamento)
         .join(Pacote)
         .outerjoin(Cachorro)
         .filter(Agendamento.data_banho == target_date)
-        .order_by(Agendamento.registrado_em.desc())
-        .all()
     )
+
+    if turno in ("manha", "tarde"):
+        query = query.filter(Agendamento.turno == turno)
+
+    agendamentos = query.order_by(Agendamento.registrado_em.desc()).all()
 
     result = []
     for ag in agendamentos:
@@ -64,17 +71,18 @@ def listar_agendamentos_data(data: str, db: Session = Depends(get_db)):
             "pacote_id": ag.pacote_id,
             "data_banho": ag.data_banho,
             "status_presenca": ag.status_presenca,
+            "turno": ag.turno,
             "extras": ag.extras,
             "registrado_em": ag.registrado_em,
             "atualizado_em": ag.atualizado_em,
             "pet_nome": ag.pacote.cachorro.nome if ag.pacote and ag.pacote.cachorro else "Pet não encontrado",
-            "cliente_nome": (ag.pacote.cachorro.cliente.nome if ag.pacote 
-                                     and ag.pacote.cachorro 
-                                     and ag.pacote.cachorro.cliente 
+            "cliente_nome": (ag.pacote.cachorro.cliente.nome if ag.pacote
+                                     and ag.pacote.cachorro
+                                     and ag.pacote.cachorro.cliente
                                      else "Cliente não encontrado")
         }
         result.append(ag_dict)
-    
+
     return result
 
 

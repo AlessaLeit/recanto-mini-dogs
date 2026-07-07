@@ -70,7 +70,8 @@ class _CachorroSimples(BaseModel):
     nome: str
     raca: Optional[str] = None
     porte: str
-    
+    criado_em: datetime
+
     model_config = ConfigDict(from_attributes=True)
 
 

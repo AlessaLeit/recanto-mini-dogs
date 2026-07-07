@@ -5,11 +5,23 @@
       <div class="modal-icon">💰</div>
       <h3 class="modal-title">Registrar Pagamento</h3>
       <p class="pacote-info">
-        Pacote <strong>{{ pacote?.tipo_plano }}</strong> —
-        Valor cobrado: <strong>R$ {{ formatarValor(pacote?.valor_cobrado) }}</strong>
-      </p>
+    Pacote <strong>{{ pacote?.tipo_plano }}</strong> —
+    Valor cobrado: <strong>R$ {{ formatarValor(pacote?.valor_cobrado) }}</strong>
+    <br/>
+    <span v-if="pacote?.valor_pago > 0">Já pago: <strong>R$ {{ formatarValor(pacote?.valor_pago) }}</strong></span>
+  </p>
 
-          <form @submit.prevent="handleSubmit">
+      <form @submit.prevent="handleSubmit">
+        <div class="form-group">
+          <label for="tipo_pagamento">Método de Pagamento</label>
+          <select id="tipo_pagamento" v-model="form.tipo_pagamento" style="width: 100%; padding: 0.65rem 0.75rem; border: 2px solid var(--creme-escuro); border-radius: 7px; background: var(--creme);">
+            <option value="pix">Pix</option>
+            <option value="dinheiro">Dinheiro</option>
+            <option value="cartao_debito">Cartão de Débito</option>
+            <option value="cartao_credito">Cartão de Crédito</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
         <div class="form-group">
           <label for="valor_pago">Valor Pago (R$)</label>
           <input
@@ -47,10 +59,15 @@ const emit = defineEmits(['close', 'confirmar'])
 
 const form = ref({
   valor_pago: 0,
-  data_pagamento: new Date().toISOString().split('T')[0]
+  data_pagamento: new Date().toISOString().split('T')[0],
+  tipo_pagamento: 'pix'
 })
 
-watch(() => props.pacote, (novo) => { if (novo) form.value.valor_pago = novo.valor_cobrado })
+watch(() => props.pacote, (novo) => { 
+  if (novo) {
+    form.value.valor_pago = novo.valor_cobrado - (novo.valor_pago || 0)
+  }
+})
 
 function handleSubmit() { emit('confirmar', { pacote_id: props.pacote.id, ...form.value }) }
 function formatarValor(valor) { return Number(valor || 0).toFixed(2).replace('.', ',') }

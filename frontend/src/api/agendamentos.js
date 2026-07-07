@@ -4,12 +4,13 @@
 import api from './index'
 
 export const agendamentosApi = {
-  // Dashboard: listar por data específica
-  listarDashboard: (data = null) => {
+  // Dashboard: listar por data específica, opcionalmente filtrando por turno (manha/tarde)
+  listarDashboard: (data = null, turno = null) => {
     // Garante que sempre envie uma data no formato YYYY-MM-DD para evitar 404
     const dateParam = data || new Date().toISOString().split('T')[0]
     const endpoint = `/agendamentos/dashboard/${dateParam}`
-    return api.get(endpoint)
+    const params = turno ? { turno } : {}
+    return api.get(endpoint, { params })
   },
   
   // Editar status/extras

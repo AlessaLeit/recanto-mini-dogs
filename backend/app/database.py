@@ -2,7 +2,7 @@
 Configuração do banco de dados usando SQLAlchemy 2.x.
 Suporta SQLite (desenvolvimento) e PostgreSQL (produção) via variável de ambiente.
 """
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from sqlalchemy.pool import StaticPool
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -69,3 +69,29 @@ def get_db() -> Generator:
         yield db
     finally:
         db.close()
+
+
+def ensure_schema_upgrades() -> None:
+    """
+    Adiciona colunas novas em tabelas já existentes.
+    `Base.metadata.create_all` só cria tabelas ausentes, não altera as existentes,
+    e este projeto não roda Alembic em produção — então os ALTERs simples ficam aqui.
+    """
+    inspector = inspect(engine)
+    colunas_novas = {
+        "agendamentos": [("turno", "VARCHAR(10) DEFAULT 'manha'")],
+        "cachorros": [("criado_em", "TIMESTAMP")],
+    }
+
+    for tabela, colunas in colunas_novas.items():
+        if tabela not in inspector.get_table_names():
+            continue
+        existentes = {c["name"] for c in inspector.get_columns(tabela)}
+        for nome_coluna, definicao_sql in colunas:
+            if nome_coluna in existentes:
+                continue
+            with engine.begin() as conn:
+                conn.execute(text(f"ALTER TABLE {tabela} ADD COLUMN {nome_coluna} {definicao_sql}"))
+            if nome_coluna == "criado_em":
+                with engine.begin() as conn:
+                    conn.execute(text(f"UPDATE {tabela} SET criado_em = CURRENT_TIMESTAMP WHERE criado_em IS NULL"))

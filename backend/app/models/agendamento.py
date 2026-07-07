@@ -16,6 +16,11 @@ class StatusPresenca(str, enum.Enum):
     CONCLUIDO = "concluido"
     FALTOU = "faltou"
 
+class Turno(str, enum.Enum):
+    """Turno do dia em que o banho está agendado"""
+    MANHA = "manha"
+    TARDE = "tarde"
+
 class Agendamento(Base):
     __tablename__ = "agendamentos"
     
@@ -34,6 +39,14 @@ class Agendamento(Base):
     status_presenca: Mapped[StatusPresenca] = mapped_column(
         SQLEnum(StatusPresenca, values_callable=lambda obj: [e.value for e in obj]),
         default=StatusPresenca.PENDENTE,
+        nullable=False
+    )
+
+    # Turno do banho (manhã/tarde), usado para filtrar a agenda do dia
+    turno: Mapped[Turno] = mapped_column(
+        SQLEnum(Turno, values_callable=lambda obj: [e.value for e in obj]),
+        default=Turno.MANHA,
+        server_default=Turno.MANHA.value,
         nullable=False
     )
     
@@ -65,6 +78,7 @@ class Agendamento(Base):
             "pacote_id": self.pacote_id,
             "data_banho": self.data_banho.isoformat() if self.data_banho else None,
             "status_presenca": self.status_presenca.value if self.status_presenca else None,
+            "turno": self.turno.value if self.turno else None,
             "extras": self.extras or {},
             "registrado_em": self.registrado_em.isoformat() if self.registrado_em else None,
             "atualizado_em": self.atualizado_em.isoformat() if self.atualizado_em else None

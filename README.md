@@ -209,10 +209,6 @@ pytest
 
 ---
 
-## Troubleshooting
-
----
-
 ## Autor
 
 Desenvolvido para gestão do **Canil Recanto Mini Dogs**.

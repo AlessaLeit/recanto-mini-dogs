@@ -1,6 +1,6 @@
 """
 Model Pacote - Representa um plano de banhos contratado.
-Um pacote pode ter múltiplos banhos registrados.
+Um pacote pode ter múltiplos banhos e pagamentos registrados.
 """
 from sqlalchemy import String, Float, ForeignKey, Boolean, DateTime, Date, func, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -25,6 +25,13 @@ class DiaSemana(str, enum.Enum):
     SEXTA = "sexta"
     SABADO = "sabado"
 
+class TipoPagamento(str, enum.Enum):
+    """Métodos de pagamento aceitos."""
+    PIX = "pix"
+    DINHEIRO = "dinheiro"
+    CARTAO_DEBITO = "cartao_debito"
+    CARTAO_CREDITO = "cartao_credito"
+    OUTRO = "outro"
 
 
 class Pacote(Base):
@@ -62,13 +69,6 @@ class Pacote(Base):
 
     # Indica se o ciclo de banhos do mês foi encerrado manualmente
     fechado: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-
-
-
-    
-    # Campos de pagamento (opcionais - pacote pode estar em aberto)
-    valor_pago: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    data_pagamento: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     
     # Status do pacote
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
@@ -83,7 +83,7 @@ class Pacote(Base):
     # Relacionamentos
     cachorro: Mapped["Cachorro"] = relationship(back_populates="pacotes")
     
-# Um pacote contém múltiplos agendamentos (e banhos legados se existirem)
+    # Um pacote contém múltiplos agendamentos, pagamentos e banhos (legado)
     agendamentos: Mapped[List["Agendamento"]] = relationship(
         back_populates="pacote",
         cascade="all, delete-orphan",
@@ -91,6 +91,11 @@ class Pacote(Base):
         order_by="Agendamento.data_banho"  # Ordena por data_banho
     )
     banhos: Mapped[List["Banho"]] = relationship(  # Mantém compatibilidade legada
+        back_populates="pacote",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
+    pagamentos: Mapped[List["Pagamento"]] = relationship(
         back_populates="pacote",
         cascade="all, delete-orphan",
         lazy="selectin"
@@ -107,17 +112,35 @@ class Pacote(Base):
         }
         return limites.get(self.tipo_plano, 1)
     
+    @property
+    def valor_pago_total(self) -> float:
+        """Soma todos os pagamentos registrados para este pacote."""
+        if not self.pagamentos:
+            return 0.0
+        return sum(p.valor_pago for p in self.pagamentos)
+
     # Propriedade calculada: status de pagamento
     @property
     def status_pagamento(self) -> str:
         """Retorna o status do pagamento do pacote"""
-        if self.valor_pago is None:
-            return "fechado" if self.fechado else "em_aberto"
+        pago_total = self.valor_pago_total
 
-        if self.valor_pago >= self.valor_cobrado:
+        if pago_total >= self.valor_cobrado:
             return "pago"
 
-        return "parcial"
+        # Atrasado: já existe um pacote mais novo (ativo) do mesmo cachorro
+        # e este pacote ainda tem saldo devedor (em aberto ou parcial).
+        if self.cachorro and self.cachorro.pacotes:
+            pacotes_ativos = [p for p in self.cachorro.pacotes if p.ativo]
+            if pacotes_ativos:
+                mais_recente = max(pacotes_ativos, key=lambda p: p.criado_em)
+                if mais_recente.id != self.id and mais_recente.criado_em > self.criado_em:
+                    return "atrasado"
+
+        if pago_total == 0:
+            return "fechado" if self.fechado else "em_aberto"
+
+        return "parcial" # Se pago_total > 0 e < valor_cobrado
     
     @property
     def total_agendamentos(self) -> int:
@@ -145,17 +168,17 @@ class Pacote(Base):
             "valor_banho_base": self.valor_banho_base,
             "valor_cobrado": self.valor_cobrado,
             "valor_transporte": self.valor_transporte,
-            "valor_pago": self.valor_pago,
+            "valor_pago": self.valor_pago_total, # Mantém compatibilidade com UI que espera 'valor_pago'
             "fechado": self.fechado,
-            "data_pagamento": self.data_pagamento.isoformat() if self.data_pagamento else None,
             "ativo": self.ativo,
             "criado_em": self.criado_em.isoformat() if self.criado_em else None,
             "pet_nome": self.cachorro.nome if self.cachorro else None,
             "cliente_nome": self.cachorro.cliente.nome if self.cachorro and self.cachorro.cliente else None,
             "status_pagamento": self.status_pagamento,
             "limite_banhos_mes": self.limite_banhos_mes,
-            "total_agendamentos": len(self.agendamentos) if self.agendamentos else 0,
-            "agendamentos": [ag.to_dict() for ag in self.agendamentos] if self.agendamentos else []
+            "total_agendamentos": self.total_agendamentos,
+            "agendamentos": [ag.to_dict() for ag in self.agendamentos] if self.agendamentos else [],
+            "pagamentos": [p.to_dict() for p in self.pagamentos] if self.pagamentos else []
         }
     
     def __repr__(self) -> str:
@@ -163,3 +186,31 @@ class Pacote(Base):
             f"<Pacote(id={self.id}, tipo='{self.tipo_plano.value}', "
             f"dia='{self.dia_da_semana.value}', ativo={self.ativo})>"
         )
+
+class Pagamento(Base):
+    __tablename__ = "pagamentos"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    pacote_id: Mapped[int] = mapped_column(ForeignKey("pacotes.id", ondelete="CASCADE"), nullable=False)
+    
+    valor_pago: Mapped[float] = mapped_column(Float, nullable=False)
+    data_pagamento: Mapped[date] = mapped_column(Date, nullable=False)
+    tipo_pagamento: Mapped[TipoPagamento] = mapped_column(
+        Enum(TipoPagamento, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
+        default=TipoPagamento.PIX,
+        server_default=TipoPagamento.PIX.value
+    )
+
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    pacote: Mapped["Pacote"] = relationship(back_populates="pagamentos")
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "pacote_id": self.pacote_id,
+            "valor_pago": self.valor_pago,
+            "data_pagamento": self.data_pagamento.isoformat(),
+            "tipo_pagamento": self.tipo_pagamento.value,
+        }

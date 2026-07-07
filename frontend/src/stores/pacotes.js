@@ -92,9 +92,9 @@ export const usePacotesStore = defineStore('pacotes', () => {
     }
   }
 
-  async function registrarPagamento(id, valor_pago, data_pagamento) {
+  async function registrarPagamento(id, dados) {
     try {
-      await pacoteApi.registrarPagamento(id, valor_pago, data_pagamento)
+      await pacoteApi.registrarPagamento(id, dados)
       await fetchPacotes()
       await fetchPacote(id)  // Refresh current
     } catch (err) {

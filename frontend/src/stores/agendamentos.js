@@ -7,9 +7,9 @@ export const useAgendamentosStore = defineStore('agendamentos', {
   }),
   
   actions: {
-    async fetchDashboard(data = null) {
+    async fetchDashboard(data = null, turno = null) {
       try {
-        const response = await agendamentosApi.listarDashboard(data)
+        const response = await agendamentosApi.listarDashboard(data, turno)
         // Ensure array even if API returns unexpected data
         this.agendamentosDashboard = Array.isArray(response.data) ? response.data : []
         console.log('Dashboard agendamentos loaded:', this.agendamentosDashboard.length)
@@ -24,10 +24,11 @@ export const useAgendamentosStore = defineStore('agendamentos', {
     async updateStatus(agendamentoId, dados) {
       try {
         const response = await agendamentosApi.atualizarStatus(agendamentoId, dados)
-        // Atualizar localmente
+        // Atualizar localmente, preservando pet_nome/cliente_nome (o PUT não os retorna)
         const index = this.agendamentosDashboard.findIndex(a => a.id === agendamentoId)
         if (index !== -1) {
-          this.agendamentosDashboard[index] = Array.isArray(response.data) ? response.data[0] : response.data
+          const atualizado = Array.isArray(response.data) ? response.data[0] : response.data
+          this.agendamentosDashboard[index] = { ...this.agendamentosDashboard[index], ...atualizado }
         }
         return response.data
       } catch (error) {

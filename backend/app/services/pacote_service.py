@@ -95,20 +95,35 @@ class PacoteService:
         self, 
         pacote_id: int, 
         valor_pago: float, 
-        data_pagamento: date
+        data_pagamento: date,
+        tipo_pagamento: Optional[str] = "pix",
+        fechar_pacote: bool = False
     ) -> dict:
         pacote = self.db.query(Pacote).options(
-            joinedload(Pacote.cachorro).joinedload(Cachorro.cliente)
+            joinedload(Pacote.cachorro).joinedload(Cachorro.cliente),
+            joinedload(Pacote.pagamentos)
         ).filter(Pacote.id == pacote_id).first()
         
         if not pacote:
-            raise HTTPException(status_code=404, detail="Pacote nao encontrado")
+            raise HTTPException(status_code=404, detail="Pacote não encontrado")
         
-        pacote.valor_pago = valor_pago
-        pacote.data_pagamento = data_pagamento
+        # Import local para evitar circularidade se necessário
+        from app.models.pacote import Pagamento, TipoPagamento
+
+        # Criar novo registro de pagamento
+        novo_pagamento = Pagamento(
+            pacote_id=pacote_id,
+            valor_pago=valor_pago,
+            data_pagamento=data_pagamento,
+            tipo_pagamento=tipo_pagamento
+        )
+        self.db.add(novo_pagamento)
+
+        # Se solicitado fechar o pacote
+        if fechar_pacote:
+            pacote.fechado = True
         
         self.db.commit()
         self.db.refresh(pacote)
         
-        # ... (restante do código de retorno omitido por brevidade)
-        return {"id": pacote.id, "status": "pago"}
+        return pacote.to_dict()

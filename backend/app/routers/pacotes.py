@@ -235,16 +235,50 @@ def deletar_pacote(
 @router.patch("/{pacote_id}/pagar", response_model=dict)
 def registrar_pagamento(
     pacote_id: int,
-    valor_pago: float,
-    data_pagamento: str,  # YYYY-MM-DD
+    dados: dict,  # Aceita payload JSON flexível
     db: Session = Depends(get_db)
 ):
     """Registra pagamento de um pacote usando o serviço."""
     service = PacoteService(db)
     from datetime import date
-    data = date.fromisoformat(data_pagamento)
-    result = service.registrar_pagamento(pacote_id, valor_pago, data)
+
+    valor_pago = dados.get("valor_pago")
+    data_str = dados.get("data_pagamento")
+    tipo = dados.get("tipo_pagamento", "pix")
+    fechar = dados.get("fechar_pacote", False)
+
+    if valor_pago is None or data_str in (None, ""):
+        raise HTTPException(status_code=400, detail="Valor e data são obrigatórios")
+
+    # Normaliza valor_pago (pode vir como string)
+    try:
+        valor_pago_float = float(valor_pago)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Valor pago inválido")
+
+    # Normaliza data_pagamento aceitando: YYYY-MM-DD ou ISO completo
+    # Ex: 2026-06-29 ou 2026-06-29T10:20:30.000Z
+    if isinstance(data_str, str):
+        data_str = data_str.strip()
+
+    if not isinstance(data_str, str):
+        raise HTTPException(status_code=400, detail="Data do pagamento inválida")
+
+    try:
+        data_iso = data_str[:10]  # garante YYYY-MM-DD
+        data = date.fromisoformat(data_iso)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de data do pagamento inválido. Use YYYY-MM-DD")
+
+    result = service.registrar_pagamento(
+        pacote_id,
+        valor_pago_float,
+        data,
+        tipo_pagamento=tipo,
+        fechar_pacote=fechar
+    )
     return result
+
 
 @router.get("/{pacote_id}/agendamentos", response_model=List[schemas.AgendamentoResponse])
 def listar_agendamentos_pacote(pacote_id: int, db: Session = Depends(get_db)):

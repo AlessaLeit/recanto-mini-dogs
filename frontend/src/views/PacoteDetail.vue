@@ -37,6 +37,18 @@
         <span class="info-value">R$ {{ formatarValor(pacote?.valor_cobrado) }}</span>
       </div>
 
+      <div class="info-card status-pago">
+        <span class="info-label">Total Pago</span>
+        <span class="info-value">R$ {{ formatarValor(pacote?.valor_pago || 0) }}</span>
+        <span class="info-sub" v-if="valorRestante > 0" style="color: #b94040; font-weight: 700;">
+          Resta: R$ {{ formatarValor(valorRestante) }}
+        </span>
+        <span class="info-sub" v-else style="color: var(--verde); font-weight: 700;">
+          Pacote Quitado
+        </span>
+      </div>
+
+
       <div class="info-card clickable" @click="abrirEditarPacote" title="Clique para editar transporte">
         <span class="info-label">Transporte</span>
         <span class="info-value">R$ {{ formatarValor(pacote?.valor_transporte || 0) }}</span>
@@ -103,14 +115,38 @@
         Nenhum agendamento encontrado.
       </div>
     </div>
+
+    <!-- Histórico de Pagamentos -->
+    <div class="pagamentos-section" v-if="pacote?.pagamentos?.length">
+      <h3 class="section-title"><span class="section-title-bar"></span> Histórico de Pagamentos</h3>
+      <table class="pagamentos-table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Valor Pago</th>
+            <th>Método</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="pg in pacote.pagamentos" :key="pg.id">
+            <td>{{ formatarData(pg.data_pagamento) }}</td>
+            <td><strong>R$ {{ formatarValor(pg.valor_pago) }}</strong></td>
+            <td>{{ formatarTipoPagamento(pg.tipo_pagamento) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+
       <!-- Seção de Exclusão: Movida para o final do card de agendamentos -->
       <div class="footer-danger-zone">
         <button @click="confirmarDeletarPacote" class="btn btn-perigo" title="Excluir este pacote">🗑️ Excluir Pacote</button>
         <div class="footer-actions">
-          <button v-if="pacote?.status_pagamento === 'em_aberto'" @click="fecharPacote" class="btn btn-ghost" style="border-color: var(--dourado); color: var(--marrom);">🔒 Fechar Pacote</button>
-          <button v-if="pacote?.status_pagamento !== 'pago'" @click="abrirPagamento" class="btn btn-primario" style="margin-left: 0.5rem;">💰 Marcar como Pago</button>
+          <button v-if="pacote?.status_pagamento === 'em_aberto' || pacote?.status_pagamento === 'parcial' || pacote?.status_pagamento === 'atrasado'" @click="abrirPagamento(true)" class="btn btn-ghost" style="border-color: var(--dourado); color: var(--marrom);">🔒 Fechar e Pagar</button>
+          <button v-if="pacote?.status_pagamento !== 'pago'" @click="abrirPagamento(false)" class="btn btn-primario" style="margin-left: 0.5rem;">💰 Registrar Pagamento</button>
         </div>
       </div>
+      
     <!-- ── MODAL: Editar Data ── -->
     <div class="modal" v-if="showEditData">
       <div class="modal-overlay" @click="showEditData = false"></div>
@@ -267,6 +303,16 @@
           <input id="pagamento-valor" type="number" step="0.01" v-model.number="formPagamento.valor_pago" />
         </div>
         <div class="form-group">
+            <label for="pagamento-tipo">Método de Pagamento</label>
+            <select id="pagamento-tipo" v-model="formPagamento.tipo_pagamento">
+              <option value="pix">Pix</option>
+              <option value="dinheiro">Dinheiro</option>
+              <option value="cartao_debito">Cartão de Débito</option>
+              <option value="cartao_credito">Cartão de Crédito</option>
+              <option value="outro">Outro</option>
+            </select>
+          </div>
+        <div class="form-group">
           <label for="pagamento-data">Data do Pagamento</label>
           <input id="pagamento-data" type="date" v-model="formPagamento.data_pagamento" />
         </div>
@@ -325,12 +371,17 @@ const dataExtra = ref('')
 const agRemovendo = ref(null)
 const agExtras = ref(null)
 const formExtras = ref({ info: '', valor_extra: 0, status_presenca: 'pendente' })
-const formPacote = ref({ tipo_plano: '', dia_da_semana: '', valor_banho_base: 0, valor_cobrado: 0, valor_transporte: 0 })
-const formPagamento = ref({ valor_pago: 0, data_pagamento: '' })
+const formPacote = ref({ tipo_plano: '', dia_da_semana: '', valor_banho_base: 0, valor_cobrado: 0, valor_transporte: 0 });
+const formPagamento = ref({ valor_pago: 0, data_pagamento: '', tipo_pagamento: 'pix', fechar_pacote: false });
 const valorSugerido = ref(0)
 const sugestaoVisivel = ref(false)
 
 const pacoteId = computed(() => Number.parseInt(route.params.id, 10))
+
+const valorRestante = computed(() => {
+  if (!pacote.value) return 0;
+  return (pacote.value.valor_cobrado || 0) - (pacote.value.valor_pago || 0);
+});
 
 const totalPacote = computed(() => {
   if (!pacote.value) return 0
@@ -378,6 +429,11 @@ function formatarDiaSemana(dia) {
   return map[dia] || '-'
 }
 
+function formatarTipoPagamento(tipo) {
+  const map = { pix: 'Pix', dinheiro: 'Dinheiro', cartao_debito: 'Débito', cartao_credito: 'Crédito', outro: 'Outro' };
+  return map[tipo] || tipo;
+}
+
 function abrirEditarData(ag) {
   agEditando.value = ag
   novaData.value = ag.data_banho
@@ -394,24 +450,21 @@ async function salvarNovaData() {
   } catch (err) {}
 }
 
-async function fecharPacote() {
-  if (!confirm('Deseja fechar este pacote? Isso indica que todos os banhos foram realizados e o acerto financeiro deve ser feito.')) return
-  try {
-    await pacotesStore.fecharPacote(pacoteId.value)
-    await carregarPacote()
-    alert('Pacote fechado com sucesso! Agora você pode registrar o pagamento.')
-  } catch (err) { alert('Erro ao fechar pacote: ' + err) }
-}
-
-function abrirPagamento() {
-  formPagamento.value.valor_pago = pacote.value.valor_cobrado
-  formPagamento.value.data_pagamento = new Date().toISOString().split('T')[0]
+function abrirPagamento(fecharAoPagar = false) {
+  formPagamento.value = {
+    valor_pago: valorRestante.value > 0 ? valorRestante.value : pacote.value.valor_cobrado,
+    data_pagamento: new Date().toISOString().split('T')[0],
+    tipo_pagamento: 'pix',
+    fechar_pacote: fecharAoPagar
+  };
   showModalPagamento.value = true
 }
 
 async function confirmarPagamento() {
   try {
-    await pacotesStore.registrarPagamento(pacoteId.value, formPagamento.value.valor_pago, formPagamento.value.data_pagamento)
+    // A store agora lida com o fechamento se necessário
+    await pacotesStore.registrarPagamento(pacoteId.value, { ...formPagamento.value });
+
     showModalPagamento.value = false
     await carregarPacote()
     alert('Pagamento registrado com sucesso!')
@@ -586,6 +639,7 @@ onMounted(carregarPacote)
 .status-pill.pago      { background: var(--verde-bg);      color: var(--verde); }
 .status-pill.parcial   { background: #fef0e0;              color: #8b5e00; }
 .status-pill.fechado   { background: #e0e0e0;              color: #424242; }
+.status-pill.atrasado  { background: #fdeaea;              color: #b94040; }
 
 /* ── INFO CARDS ── */
 .info-cards {
@@ -610,6 +664,7 @@ onMounted(carregarPacote)
 .info-card:nth-child(3) { border-bottom-color: var(--verde); }
 .info-card:nth-child(4) { border-bottom-color: var(--marrom-claro); }
 .info-card:nth-child(5) { border-bottom-color: var(--verde); }
+.info-card.status-pago { border-bottom-color: var(--marrom-claro); }
 
 .info-card.clickable { cursor: pointer; }
 .info-card.clickable:hover {
@@ -773,6 +828,13 @@ onMounted(carregarPacote)
   color: var(--text-muted);
   font-style: italic;
 }
+
+/* Seção de Pagamentos */
+.pagamentos-section {
+  margin-top: 1.5rem;
+  background: var(--white); border-radius: var(--radius); padding: 1.5rem; box-shadow: var(--shadow);
+}
+.pagamentos-table { width: 100%; border-collapse: collapse; }
 
 /* ── BOTÕES GERAIS ── */
 .btn {

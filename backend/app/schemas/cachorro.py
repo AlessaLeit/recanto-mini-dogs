@@ -65,7 +65,8 @@ class CachorroResponse(CachorroBase):
     """Schema de resposta completo"""
     id: int
     cliente_id: int
-    
+    criado_em: datetime
+
     model_config = ConfigDict(
         from_attributes=True,
         json_schema_extra={
@@ -75,7 +76,8 @@ class CachorroResponse(CachorroBase):
                 "nome": "Rex",
                 "raca": "Golden Retriever",
                 "porte": "grande",
-                "observacoes": "Alergia a shampoos com perfume"
+                "observacoes": "Alergia a shampoos com perfume",
+                "criado_em": "2024-01-15T10:30:00"
             }
         }
     )
@@ -96,5 +98,5 @@ class _PacoteSimples(BaseModel):
 class CachorroWithPacotes(CachorroResponse):
     """Schema incluindo histórico de pacotes"""
     pacotes: List[_PacoteSimples] = []
-    
+
     model_config = ConfigDict(from_attributes=True)

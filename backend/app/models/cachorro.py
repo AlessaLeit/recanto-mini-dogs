@@ -2,10 +2,11 @@
 Model Cachorro - Representa o pet.
 Um cachorro pertence a um cliente e pode ter múltiplos pacotes (histórico).
 """
-from sqlalchemy import String, Text, ForeignKey, Enum
+from sqlalchemy import String, Text, ForeignKey, Enum, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 from typing import List, Optional, Literal
+from datetime import datetime
 import enum
 
 
@@ -43,7 +44,14 @@ class Cachorro(Base):
     
     # Status de ativação do pet
     ativo: Mapped[bool] = mapped_column(default=True)
-    
+
+    # Timestamp de cadastro (usado para filtros por período no dashboard)
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
+    )
+
     # Relacionamentos
     cliente: Mapped["Cliente"] = relationship(back_populates="cachorros")
     

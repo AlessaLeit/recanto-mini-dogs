@@ -2,27 +2,42 @@
   <div class="dashboard">
     <div class="page-header">
       <h1 class="page-title">Dashboard</h1>
+      <div class="periodo-filtro">
+        <label for="periodo-select">Período</label>
+        <select id="periodo-select" v-model="statsFiltro">
+          <option value="dia">Dia</option>
+          <option value="semana">Semana</option>
+          <option value="mes">Mês</option>
+          <option value="periodo">Período</option>
+          <option value="ano">Ano</option>
+        </select>
+        <template v-if="statsFiltro === 'periodo'">
+          <input type="date" v-model="statsPeriodoInicio" class="periodo-data" />
+          <span class="periodo-ate">até</span>
+          <input type="date" v-model="statsPeriodoFim" class="periodo-data" />
+        </template>
+      </div>
     </div>
 
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-icon">👥</div>
-        <div class="stat-value">{{ clientesStore.totalClientes }}</div>
+        <div class="stat-value">{{ totalClientesFiltrado }}</div>
         <div class="stat-label">Clientes</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">🐕</div>
-        <div class="stat-value">{{ totalCachorros }}</div>
+        <div class="stat-value">{{ totalCachorrosFiltrado }}</div>
         <div class="stat-label">Cachorros</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">📦</div>
-        <div class="stat-value">{{ pacotesStore.pacotesAtivos.length }}</div>
+        <div class="stat-value">{{ pacotesAtivosFiltrados.length }}</div>
         <div class="stat-label">Pacotes Ativos</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">💰</div>
-        <div class="stat-value">R$ {{ formatarValor(pacotesStore.totalReceitaPrevista) }}</div>
+        <div class="stat-value">R$ {{ formatarValor(receitaPrevistaFiltrada) }}</div>
         <div class="stat-label">Receita Prevista</div>
       </div>
     </div>
@@ -36,7 +51,14 @@
       <div class="card">
       <div class="card-header-row">
         <div class="card-title" style="margin-bottom:0"><span class="card-title-bar"></span>📋 Agendamentos — {{ formatarData(dataSelecionada) }}</div>
-        <button @click="carregarAgendamentos()" class="btn-refresh">↻ Atualizar</button>
+        <div class="ag-header-actions">
+          <select v-model="turnoFiltro" @change="carregarAgendamentos()" class="select-turno">
+            <option value="todos">Todos os turnos</option>
+            <option value="manha">Manhã</option>
+            <option value="tarde">Tarde</option>
+          </select>
+          <button @click="carregarAgendamentos()" class="btn-refresh">↻ Atualizar</button>
+        </div>
       </div>
       <div v-if="agendamentosStore.agendamentosDashboard.length === 0" class="empty-state">
         Nenhum agendamento nesta data. Clique no calendário para ver outros dias.
@@ -47,6 +69,7 @@
           :key="ag.id"
           class="ag-card"
           :class="ag.status_presenca"
+          @click="editarAgendamento(ag)"
         >
           <div class="ag-header">
             <div>
@@ -57,20 +80,8 @@
               {{ ag.status_presenca.toUpperCase() }}
             </span>
           </div>
-          <div class="ag-details">
-            <p>
-              <span class="link-pacote" @click="verDetalhes({ id: ag.pacote_id })" title="Clique para ver detalhes do pacote">
-                Pacote #{{ ag.pacote_id }}
-              </span>
-              | {{ formatarData(ag.data_banho) }}
-            </p>
-            <div v-if="ag.extras && Object.keys(ag.extras).length" class="extras">
-              <strong>Extras:</strong> {{ Object.entries(ag.extras).map(([k,v]) => `${k}: ${v}`).join(', ') }}
-            </div>
-          </div>
-          <button @click="editarAgendamento(ag)" class="btn-editar">Editar</button>
         </div>
-      </div> 
+      </div>
     </div>
     </div>
 
@@ -110,9 +121,24 @@
           </select>
         </div>
         <div class="form-group">
-          <label for="edit-extras">Extras (JSON)</label>
-          <textarea id="edit-extras" v-model="agEdit.extras_str" rows="3" placeholder='{"observacao": "Banho extra"}'></textarea>
-          <small class="field-hint">Formato JSON simples</small>
+          <label for="edit-turno">Turno</label>
+          <select id="edit-turno" v-model="agEdit.turno">
+            <option value="manha">🌅 Manhã</option>
+            <option value="tarde">🌇 Tarde</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="edit-info">Itens Extra / Descrição</label>
+          <input id="edit-info" v-model="agEdit.extras.info" placeholder="Ex: Tosa higiênica, Shampoo especial..." />
+        </div>
+        <div class="form-group">
+          <label for="edit-valor-extra">Valor Extra (R$)</label>
+          <input
+            id="edit-valor-extra"
+            type="number"
+            step="0.01"
+            v-model.number="agEdit.extras.valor_extra"
+          />
         </div>
         <div class="modal-actions">
           <button @click="showModalEdit = false" class="btn btn-cancelar">Cancelar</button>
@@ -144,12 +170,81 @@ const showModalEdit = ref(false)
 const agEdit = ref(null)
 const showPagamento = ref(false)
 const pacoteSelecionado = ref(null)
+const turnoFiltro = ref('todos')
 
-const totalCachorros = computed(() =>
-  clientesStore.clientes.reduce((sum, c) => sum + (c.cachorros?.length || 0), 0)
+// Filtro de período dos cards de estatística do topo
+const statsFiltro = ref('mes')
+const statsPeriodoInicio = ref('')
+const statsPeriodoFim = ref('')
+
+const statsRange = computed(() => {
+  const hoje = new Date()
+  hoje.setHours(0, 0, 0, 0)
+
+  if (statsFiltro.value === 'dia') {
+    const fim = new Date(hoje)
+    fim.setHours(23, 59, 59, 999)
+    return { inicio: hoje, fim }
+  }
+  if (statsFiltro.value === 'semana') {
+    const diaSemana = hoje.getDay()
+    const offsetSegunda = diaSemana === 0 ? 6 : diaSemana - 1
+    const inicio = new Date(hoje)
+    inicio.setDate(hoje.getDate() - offsetSegunda)
+    const fim = new Date(inicio)
+    fim.setDate(inicio.getDate() + 6)
+    fim.setHours(23, 59, 59, 999)
+    return { inicio, fim }
+  }
+  if (statsFiltro.value === 'ano') {
+    return {
+      inicio: new Date(hoje.getFullYear(), 0, 1),
+      fim: new Date(hoje.getFullYear(), 11, 31, 23, 59, 59, 999)
+    }
+  }
+  if (statsFiltro.value === 'periodo') {
+    const inicio = statsPeriodoInicio.value ? new Date(`${statsPeriodoInicio.value}T00:00:00`) : new Date(0)
+    const fim = statsPeriodoFim.value ? new Date(`${statsPeriodoFim.value}T23:59:59`) : new Date()
+    return { inicio, fim }
+  }
+  // mes (padrão)
+  return {
+    inicio: new Date(hoje.getFullYear(), hoje.getMonth(), 1),
+    fim: new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59, 999)
+  }
+})
+
+function dentroDoPeriodo(dataStr) {
+  if (!dataStr) return false
+  // O backend envia timestamps UTC sem sufixo de fuso (ex.: "2026-07-04T03:43:49"),
+  // que o JS interpretaria como hora local por padrão. Forçamos UTC para comparar corretamente.
+  const temFuso = /Z$|[+-]\d{2}:\d{2}$/.test(dataStr)
+  const d = new Date(temFuso ? dataStr : `${dataStr}Z`)
+  return d >= statsRange.value.inicio && d <= statsRange.value.fim
+}
+
+const totalClientesFiltrado = computed(() =>
+  clientesStore.clientes.filter(c => dentroDoPeriodo(c.criado_em)).length
 )
+const totalCachorrosFiltrado = computed(() =>
+  clientesStore.clientes.reduce(
+    (sum, c) => sum + (c.cachorros || []).filter(cc => dentroDoPeriodo(cc.criado_em)).length,
+    0
+  )
+)
+const pacotesAtivosFiltrados = computed(() =>
+  pacotesStore.pacotesAtivos.filter(p => dentroDoPeriodo(p.criado_em))
+)
+const receitaPrevistaFiltrada = computed(() =>
+  pacotesAtivosFiltrados.value.reduce((sum, p) => sum + (Number(p.valor_cobrado) || 0), 0)
+)
+
 const pacotesEmAberto = computed(() =>
-  pacotesStore.pacotes.filter(p => p.ativo && (p.status_pagamento === 'em_aberto' || p.status_pagamento === 'fechado'))
+  pacotesStore.pacotes.filter(p => p.ativo && (
+    p.status_pagamento === 'em_aberto' ||
+    p.status_pagamento === 'fechado' ||
+    p.status_pagamento === 'atrasado'
+  ))
 )
 const banhosRecentes = computed(() => {
   const banhos = []
@@ -171,7 +266,12 @@ function verDetalhes(pacote) {
 }
 async function confirmarPagamento(dados) {
   try {
-    await pacotesStore.registrarPagamento(dados.pacote_id, dados.valor_pago, dados.data_pagamento)
+    await pacotesStore.registrarPagamento(dados.pacote_id, {
+      valor_pago: dados.valor_pago,
+      data_pagamento: dados.data_pagamento,
+      tipo_pagamento: 'pix',
+      fechar_pacote: false
+    })
     showPagamento.value = false
     alert('Pagamento registrado com sucesso!')
   } catch (err) {
@@ -180,7 +280,8 @@ async function confirmarPagamento(dados) {
 }
 async function carregarAgendamentos() {
   try {
-    await agendamentosStore.fetchDashboard(dataSelecionada.value)
+    const turno = turnoFiltro.value === 'todos' ? null : turnoFiltro.value
+    await agendamentosStore.fetchDashboard(dataSelecionada.value, turno)
   } catch (err) {
     alert('Erro ao carregar agendamentos: ' + err.message)
   }
@@ -193,15 +294,24 @@ function formatarData(dataStr) {
   return new Date(dataStr).toLocaleDateString('pt-BR')
 }
 function editarAgendamento(ag) {
-  agEdit.value = { ...ag, extras_str: JSON.stringify(ag.extras || {}, null, 2) }
+  // Garante que 'extras' seja um objeto com as chaves esperadas
+  const extras = ag.extras || {}
+  agEdit.value = {
+    ...ag,
+    turno: ag.turno || 'manha',
+    extras: {
+      info: extras.info || '',
+      valor_extra: extras.valor_extra || 0
+    }
+  }
   showModalEdit.value = true
 }
 async function salvarAgendamento() {
   try {
-    const extras = JSON.parse(agEdit.value.extras_str || '{}')
     await agendamentosStore.updateStatus(agEdit.value.id, {
       status_presenca: agEdit.value.status_presenca,
-      extras
+      turno: agEdit.value.turno,
+      extras: agEdit.value.extras
     })
     showModalEdit.value = false
     alert('Agendamento atualizado!')
@@ -237,7 +347,14 @@ onMounted(async () => {
   --shadow:        0 2px 12px rgba(59,42,26,0.1);
 }
 
-.page-header { margin-bottom: 1.5rem; }
+.page-header {
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
 
 .page-title {
   font-size: 1.6rem;
@@ -246,6 +363,27 @@ onMounted(async () => {
   border-left: 5px solid var(--dourado);
   padding-left: 0.75rem;
 }
+
+.periodo-filtro {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.periodo-filtro label {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--marrom);
+}
+.periodo-filtro select,
+.periodo-filtro .periodo-data {
+  padding: 6px 10px;
+  border: 2px solid var(--creme-escuro);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: var(--white);
+}
+.periodo-ate { font-size: 0.85rem; color: var(--text-muted); }
 
 /* STATS */
 .stats-grid {
@@ -306,6 +444,21 @@ onMounted(async () => {
   margin-bottom: 1rem;
 }
 
+/* AÇÕES DO CARD DE AGENDAMENTOS */
+.ag-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.select-turno {
+  padding: 6px 10px;
+  border: 1px solid var(--creme-escuro);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--marrom);
+  background: var(--white);
+}
+
 /* BOTÃO REFRESH */
 .btn-refresh {
   background: var(--creme-escuro);
@@ -337,22 +490,16 @@ onMounted(async () => {
   border-radius: var(--radius);
   padding: 1rem 1.2rem;
   border-left: 4px solid var(--dourado);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
 }
+.ag-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
 .ag-card.pendente  { border-left-color: #d4a843; }
 .ag-card.concluido { border-left-color: var(--verde); background: var(--verde-bg); }
 .ag-card.faltou    { border-left-color: #b94040; background: #fdf0f0; }
-.ag-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; }
+.ag-header { display: flex; justify-content: space-between; align-items: flex-start; }
 .ag-pet { font-size: 1rem; font-weight: 800; color: var(--marrom); margin: 0; }
 .ag-cliente { color: var(--text-muted); font-size: 0.85rem; margin: 2px 0 0; }
-.link-pacote {
-  color: var(--marrom-claro);
-  font-weight: 700;
-  text-decoration: underline;
-  cursor: pointer;
-  transition: color 0.2s;
-}
-.link-pacote:hover { color: var(--dourado); }
-.ag-details { font-size: 0.85rem; color: var(--text-muted); }
 
 .status-badge {
   padding: 3px 10px;
@@ -364,20 +511,6 @@ onMounted(async () => {
 .status-pendente  { background: var(--dourado-claro); color: #6b4c00; }
 .status-concluido { background: var(--verde-bg); color: var(--verde); }
 .status-faltou    { background: #fdeaea; color: #b94040; }
-
-.btn-editar {
-  background: var(--marrom);
-  color: var(--dourado);
-  border: none;
-  padding: 6px 14px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.85rem;
-  font-weight: 700;
-  margin-top: 0.5rem;
-  transition: background 0.15s;
-}
-.btn-editar:hover { background: var(--marrom-medio); }
 
 /* MODAL */
 .modal-overlay {
@@ -403,12 +536,13 @@ onMounted(async () => {
   font-weight: 700; font-size: 0.9rem; color: var(--marrom);
 }
 .form-group select,
+.form-group input,
 .form-group textarea {
   width: 100%; padding: 0.6rem 0.75rem;
   border: 2px solid var(--creme-escuro);
   border-radius: 7px; font-size: 0.95rem;
   color: var(--text); background: var(--creme);
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
   box-sizing: border-box;
 }
 .form-group select:focus,

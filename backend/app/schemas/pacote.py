@@ -78,8 +78,8 @@ class PacoteResponse(BaseModel):
     valor_banho_base: float
     valor_cobrado: float
     valor_transporte: float = 0.0
-    valor_pago: Optional[float] = None
-    data_pagamento: Optional[date] = None
+    valor_pago: float = 0.0
+    pagamentos: List[Any] = []
     ativo: bool
     criado_em: datetime
 
