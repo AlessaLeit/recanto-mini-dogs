@@ -12,8 +12,14 @@ export const pacoteApi = {
   deletar: (id) => api.delete(`/pacotes/${id}`),
   
   // Ações específicas
-  registrarPagamento: (id, dados) => 
+  registrarPagamento: (id, dados) =>
     api.patch(`/pacotes/${id}/pagar`, dados),
+
+  atualizarPagamento: (pacoteId, pagamentoId, dados) =>
+    api.put(`/pacotes/${pacoteId}/pagamentos/${pagamentoId}`, dados),
+
+  deletarPagamento: (pacoteId, pagamentoId) =>
+    api.delete(`/pacotes/${pacoteId}/pagamentos/${pagamentoId}`),
 
   fechar: (id) => api.patch(`/pacotes/${id}/fechar`),
 

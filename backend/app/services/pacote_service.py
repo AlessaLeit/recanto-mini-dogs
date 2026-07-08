@@ -92,21 +92,22 @@ class PacoteService:
             )
     
     def registrar_pagamento(
-        self, 
-        pacote_id: int, 
-        valor_pago: float, 
+        self,
+        pacote_id: int,
+        valor_pago: float,
         data_pagamento: date,
         tipo_pagamento: Optional[str] = "pix",
-        fechar_pacote: bool = False
+        fechar_pacote: bool = False,
+        observacao: Optional[str] = None
     ) -> dict:
         pacote = self.db.query(Pacote).options(
             joinedload(Pacote.cachorro).joinedload(Cachorro.cliente),
             joinedload(Pacote.pagamentos)
         ).filter(Pacote.id == pacote_id).first()
-        
+
         if not pacote:
             raise HTTPException(status_code=404, detail="Pacote não encontrado")
-        
+
         # Import local para evitar circularidade se necessário
         from app.models.pacote import Pagamento, TipoPagamento
 
@@ -115,7 +116,8 @@ class PacoteService:
             pacote_id=pacote_id,
             valor_pago=valor_pago,
             data_pagamento=data_pagamento,
-            tipo_pagamento=tipo_pagamento
+            tipo_pagamento=tipo_pagamento,
+            observacao=observacao
         )
         self.db.add(novo_pagamento)
 

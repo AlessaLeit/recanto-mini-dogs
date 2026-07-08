@@ -2,7 +2,7 @@
 Model Pacote - Representa um plano de banhos contratado.
 Um pacote pode ter múltiplos banhos e pagamentos registrados.
 """
-from sqlalchemy import String, Float, ForeignKey, Boolean, DateTime, Date, func, Enum
+from sqlalchemy import String, Text, Float, ForeignKey, Boolean, DateTime, Date, func, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 from typing import List, Optional, Literal
@@ -202,6 +202,8 @@ class Pagamento(Base):
         server_default=TipoPagamento.PIX.value
     )
 
+    observacao: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     pacote: Mapped["Pacote"] = relationship(back_populates="pagamentos")
@@ -213,4 +215,5 @@ class Pagamento(Base):
             "valor_pago": self.valor_pago,
             "data_pagamento": self.data_pagamento.isoformat(),
             "tipo_pagamento": self.tipo_pagamento.value,
+            "observacao": self.observacao,
         }

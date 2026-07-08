@@ -103,6 +103,28 @@ export const usePacotesStore = defineStore('pacotes', () => {
     }
   }
 
+  async function atualizarPagamento(pacoteId, pagamentoId, dados) {
+    try {
+      await pacoteApi.atualizarPagamento(pacoteId, pagamentoId, dados)
+      await fetchPacotes()
+      await fetchPacote(pacoteId)
+    } catch (err) {
+      console.error(err.response?.data?.detail || 'Erro ao atualizar pagamento')
+      throw err
+    }
+  }
+
+  async function deletarPagamento(pacoteId, pagamentoId) {
+    try {
+      await pacoteApi.deletarPagamento(pacoteId, pagamentoId)
+      await fetchPacotes()
+      await fetchPacote(pacoteId)
+    } catch (err) {
+      console.error(err.response?.data?.detail || 'Erro ao excluir pagamento')
+      throw err
+    }
+  }
+
   async function fecharPacote(id) {
     try {
       const response = await pacoteApi.fechar(id)
@@ -213,6 +235,8 @@ export const usePacotesStore = defineStore('pacotes', () => {
     deletarPacote,
     fecharPacote,
     registrarPagamento,
+    atualizarPagamento,
+    deletarPagamento,
     updateAgendamento,
     updateAgendamentoData,
     removerAgendamento,

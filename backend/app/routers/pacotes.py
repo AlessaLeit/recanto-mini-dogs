@@ -246,6 +246,7 @@ def registrar_pagamento(
     data_str = dados.get("data_pagamento")
     tipo = dados.get("tipo_pagamento", "pix")
     fechar = dados.get("fechar_pacote", False)
+    observacao = dados.get("observacao")
 
     if valor_pago is None or data_str in (None, ""):
         raise HTTPException(status_code=400, detail="Valor e data são obrigatórios")
@@ -275,9 +276,53 @@ def registrar_pagamento(
         valor_pago_float,
         data,
         tipo_pagamento=tipo,
-        fechar_pacote=fechar
+        fechar_pacote=fechar,
+        observacao=observacao
     )
     return result
+
+
+@router.put("/{pacote_id}/pagamentos/{pagamento_id}", response_model=schemas.PagamentoResponse)
+def atualizar_pagamento(
+    pacote_id: int,
+    pagamento_id: int,
+    dados: schemas.PagamentoUpdate,
+    db: Session = Depends(get_db)
+):
+    """Edita um pagamento já registrado (valor, data, método ou observação)."""
+    pagamento = db.query(models.Pagamento).filter(
+        models.Pagamento.id == pagamento_id,
+        models.Pagamento.pacote_id == pacote_id
+    ).first()
+    if not pagamento:
+        raise HTTPException(status_code=404, detail="Pagamento não encontrado")
+
+    update_data = dados.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(pagamento, field, value)
+
+    db.commit()
+    db.refresh(pagamento)
+    return schemas.PagamentoResponse.model_validate(pagamento).model_dump()
+
+
+@router.delete("/{pacote_id}/pagamentos/{pagamento_id}", status_code=status.HTTP_204_NO_CONTENT)
+def deletar_pagamento(
+    pacote_id: int,
+    pagamento_id: int,
+    db: Session = Depends(get_db)
+):
+    """Remove um pagamento registrado (ex.: lançamento feito por engano)."""
+    pagamento = db.query(models.Pagamento).filter(
+        models.Pagamento.id == pagamento_id,
+        models.Pagamento.pacote_id == pacote_id
+    ).first()
+    if not pagamento:
+        raise HTTPException(status_code=404, detail="Pagamento não encontrado")
+
+    db.delete(pagamento)
+    db.commit()
+    return None
 
 
 @router.get("/{pacote_id}/agendamentos", response_model=List[schemas.AgendamentoResponse])

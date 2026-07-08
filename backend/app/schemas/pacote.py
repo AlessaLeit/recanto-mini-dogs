@@ -7,7 +7,7 @@ from datetime import date, datetime
 from enum import Enum
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .agendamento import AgendamentoResponse
 
@@ -30,6 +30,26 @@ class StatusPagamento(str, Enum):
     EM_ABERTO = "em_aberto"
     PAGO = "pago"
     ATRASADO = "atrasado"
+
+
+class PagamentoResponse(BaseModel):
+    id: int
+    pacote_id: int
+    valor_pago: float
+    data_pagamento: date
+    tipo_pagamento: str
+    observacao: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PagamentoUpdate(BaseModel):
+    valor_pago: Optional[float] = Field(default=None, gt=0)
+    data_pagamento: Optional[date] = None
+    tipo_pagamento: Optional[str] = None
+    observacao: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PacoteBase(BaseModel):
@@ -79,7 +99,7 @@ class PacoteResponse(BaseModel):
     valor_cobrado: float
     valor_transporte: float = 0.0
     valor_pago: float = 0.0
-    pagamentos: List[Any] = []
+    pagamentos: List[PagamentoResponse] = []
     ativo: bool
     criado_em: datetime
 
@@ -92,6 +112,14 @@ class PacoteResponse(BaseModel):
     agendamentos: List[AgendamentoResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="after")
+    def _calcular_valor_pago(self):
+        # 'valor_pago' não existe como atributo no model (só 'valor_pago_total',
+        # calculado a partir de 'pagamentos'), então o from_attributes nunca o
+        # preenche sozinho. Recalcula aqui para refletir a soma real dos pagamentos.
+        self.valor_pago = sum(p.valor_pago for p in self.pagamentos)
+        return self
 
 
 class PacoteWithBanhos(PacoteResponse):

@@ -125,13 +125,22 @@
             <th>Data</th>
             <th>Valor Pago</th>
             <th>Método</th>
+            <th>Observação</th>
+            <th>Ações</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="pg in pacote.pagamentos" :key="pg.id">
-            <td>{{ formatarData(pg.data_pagamento) }}</td>
-            <td><strong>R$ {{ formatarValor(pg.valor_pago) }}</strong></td>
+            <td><strong>{{ formatarData(pg.data_pagamento) }}</strong></td>
+            <td>R$ {{ formatarValor(pg.valor_pago) }}</td>
             <td>{{ formatarTipoPagamento(pg.tipo_pagamento) }}</td>
+            <td class="col-observacao">{{ pg.observacao || '-' }}</td>
+            <td>
+              <div class="acoes">
+                <button @click="abrirEditarPagamento(pg)" class="btn-acao btn-acao-ghost" title="Editar pagamento">✏️</button>
+                <button @click="confirmarRemoverPagamento(pg)" class="btn-acao btn-acao-perigo" title="Excluir pagamento">✕</button>
+              </div>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -290,12 +299,12 @@
       </div>
     </div>
 
-    <!-- ── MODAL: Registrar Pagamento ── -->
+    <!-- ── MODAL: Registrar/Editar Pagamento ── -->
     <div class="modal" v-if="showModalPagamento">
       <div class="modal-overlay" @click="showModalPagamento = false"></div>
       <div class="modal-content">
         <div class="modal-header">
-          <h3>Registrar Pagamento</h3>
+          <h3>{{ pagamentoEditando ? 'Editar Pagamento' : 'Registrar Pagamento' }}</h3>
           <p class="modal-sub">💰 {{ pacote?.pet_nome }}</p>
         </div>
         <div class="form-group">
@@ -316,9 +325,32 @@
           <label for="pagamento-data">Data do Pagamento</label>
           <input id="pagamento-data" type="date" v-model="formPagamento.data_pagamento" />
         </div>
+        <div class="form-group">
+          <label for="pagamento-observacao">Observação (opcional)</label>
+          <textarea id="pagamento-observacao" v-model="formPagamento.observacao" rows="2" placeholder="Ex: pagamento referente à segunda parcela"></textarea>
+        </div>
         <div class="modal-actions">
           <button @click="showModalPagamento = false" class="btn btn-cancelar">Cancelar</button>
-          <button @click="confirmarPagamento" class="btn btn-primario">Confirmar Recebimento</button>
+          <button @click="confirmarPagamento" class="btn btn-primario">{{ pagamentoEditando ? 'Salvar Alterações' : 'Confirmar Recebimento' }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MODAL: Confirmar Exclusão de Pagamento ── -->
+    <div class="modal" v-if="showConfirmRemovePagamento">
+      <div class="modal-overlay" @click="showConfirmRemovePagamento = false"></div>
+      <div class="modal-content">
+        <div class="modal-header modal-header-danger">
+          <h3>⚠️ Confirmar Exclusão</h3>
+        </div>
+        <p class="modal-info">
+          Excluir o pagamento de <strong>R$ {{ formatarValor(pagamentoRemovendo?.valor_pago) }}</strong>
+          em <strong>{{ formatarData(pagamentoRemovendo?.data_pagamento) }}</strong>?
+        </p>
+        <p class="warning-text">O status de pagamento do pacote será recalculado. Esta ação não pode ser desfeita.</p>
+        <div class="modal-actions">
+          <button @click="showConfirmRemovePagamento = false" class="btn btn-cancelar">Cancelar</button>
+          <button @click="executarRemoverPagamento" class="btn btn-perigo">Excluir</button>
         </div>
       </div>
     </div>
@@ -363,16 +395,19 @@ const showConfirmDeletePacote = ref(false)
 const showModalExtras = ref(false)
 const showModalEditPacote = ref(false)
 const showModalPagamento = ref(false)
+const showConfirmRemovePagamento = ref(false)
 
 // Dados dos modais
 const agEditando = ref(null)
 const novaData = ref('')
 const dataExtra = ref('')
 const agRemovendo = ref(null)
+const pagamentoEditando = ref(null)
+const pagamentoRemovendo = ref(null)
 const agExtras = ref(null)
 const formExtras = ref({ info: '', valor_extra: 0, status_presenca: 'pendente' })
 const formPacote = ref({ tipo_plano: '', dia_da_semana: '', valor_banho_base: 0, valor_cobrado: 0, valor_transporte: 0 });
-const formPagamento = ref({ valor_pago: 0, data_pagamento: '', tipo_pagamento: 'pix', fechar_pacote: false });
+const formPagamento = ref({ valor_pago: 0, data_pagamento: '', tipo_pagamento: 'pix', fechar_pacote: false, observacao: '' });
 const valorSugerido = ref(0)
 const sugestaoVisivel = ref(false)
 
@@ -451,24 +486,66 @@ async function salvarNovaData() {
 }
 
 function abrirPagamento(fecharAoPagar = false) {
+  pagamentoEditando.value = null
   formPagamento.value = {
     valor_pago: valorRestante.value > 0 ? valorRestante.value : pacote.value.valor_cobrado,
     data_pagamento: new Date().toISOString().split('T')[0],
     tipo_pagamento: 'pix',
-    fechar_pacote: fecharAoPagar
+    fechar_pacote: fecharAoPagar,
+    observacao: ''
+  };
+  showModalPagamento.value = true
+}
+
+function abrirEditarPagamento(pg) {
+  pagamentoEditando.value = pg
+  formPagamento.value = {
+    valor_pago: pg.valor_pago,
+    data_pagamento: pg.data_pagamento,
+    tipo_pagamento: pg.tipo_pagamento,
+    fechar_pacote: false,
+    observacao: pg.observacao || ''
   };
   showModalPagamento.value = true
 }
 
 async function confirmarPagamento() {
   try {
-    // A store agora lida com o fechamento se necessário
-    await pacotesStore.registrarPagamento(pacoteId.value, { ...formPagamento.value });
-
-    showModalPagamento.value = false
-    await carregarPacote()
-    alert('Pagamento registrado com sucesso!')
+    if (pagamentoEditando.value) {
+      await pacotesStore.atualizarPagamento(pacoteId.value, pagamentoEditando.value.id, {
+        valor_pago: formPagamento.value.valor_pago,
+        data_pagamento: formPagamento.value.data_pagamento,
+        tipo_pagamento: formPagamento.value.tipo_pagamento,
+        observacao: formPagamento.value.observacao
+      })
+      showModalPagamento.value = false
+      await carregarPacote()
+      alert('Pagamento atualizado com sucesso!')
+    } else {
+      // A store agora lida com o fechamento se necessário
+      await pacotesStore.registrarPagamento(pacoteId.value, { ...formPagamento.value });
+      showModalPagamento.value = false
+      await carregarPacote()
+      alert('Pagamento registrado com sucesso!')
+    }
   } catch (err) { alert('Erro ao registrar pagamento: ' + err) }
+}
+
+function confirmarRemoverPagamento(pg) {
+  pagamentoRemovendo.value = pg
+  showConfirmRemovePagamento.value = true
+}
+
+async function executarRemoverPagamento() {
+  if (!pagamentoRemovendo.value) return
+  try {
+    await pacotesStore.deletarPagamento(pacoteId.value, pagamentoRemovendo.value.id)
+    showConfirmRemovePagamento.value = false
+    pagamentoRemovendo.value = null
+    await carregarPacote()
+  } catch (err) {
+    alert('Erro ao excluir pagamento: ' + err)
+  }
 }
 
 function abrirEditarPacote() {
@@ -834,7 +911,37 @@ onMounted(carregarPacote)
   margin-top: 1.5rem;
   background: var(--white); border-radius: var(--radius); padding: 1.5rem; box-shadow: var(--shadow);
 }
-.pagamentos-table { width: 100%; border-collapse: collapse; }
+.pagamentos-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.pagamentos-table th {
+  padding: 0.85rem 0.9rem;
+  text-align: left;
+  background: var(--creme);
+  font-weight: 800;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid var(--creme-escuro);
+}
+.pagamentos-table td {
+  padding: 0.85rem 0.9rem;
+  border-bottom: 1px solid var(--creme-escuro);
+  font-size: 0.9rem;
+  color: var(--text);
+  vertical-align: middle;
+}
+.pagamentos-table tbody tr:last-child td { border-bottom: none; }
+.pagamentos-table tbody tr:hover td { background: var(--creme); }
+.pagamentos-table .col-observacao {
+  color: var(--text-muted);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ── BOTÕES GERAIS ── */
 .btn {
@@ -940,20 +1047,24 @@ onMounted(carregarPacote)
 }
 
 .form-group input,
-.form-group select {
+.form-group select,
+.form-group textarea {
   width: 100%;
   padding: 0.65rem 0.85rem;
   border: 2px solid var(--creme-escuro);
   border-radius: 7px;
   font-size: 0.95rem;
+  font-family: inherit;
   color: var(--text);
   background: var(--creme);
   box-sizing: border-box;
   transition: border-color 0.15s, box-shadow 0.15s;
   outline: none;
+  resize: vertical;
 }
 .form-group input:focus,
-.form-group select:focus {
+.form-group select:focus,
+.form-group textarea:focus {
   border-color: var(--dourado);
   box-shadow: 0 0 0 3px rgba(212,168,67,0.12);
   background: var(--white);

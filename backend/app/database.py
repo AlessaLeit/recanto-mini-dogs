@@ -24,7 +24,8 @@ class Settings(BaseSettings):
     # Segurança e Autenticação
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    # 12h: cobre um expediente inteiro sem deslogar a equipe no meio do uso
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 720
     ADMIN_EMAIL: str
     ADMIN_PASSWORD: str
 
@@ -81,6 +82,7 @@ def ensure_schema_upgrades() -> None:
     colunas_novas = {
         "agendamentos": [("turno", "VARCHAR(10) DEFAULT 'manha'")],
         "cachorros": [("criado_em", "TIMESTAMP")],
+        "pagamentos": [("observacao", "TEXT")],
     }
 
     for tabela, colunas in colunas_novas.items():
