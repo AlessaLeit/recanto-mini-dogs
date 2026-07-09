@@ -1,7 +1,10 @@
 <template>
   <div class="pacote-card" :class="{ inativo: !pacote.ativo }">
     <div class="card-header">
-      <h3 class="plano-label">{{ tipoPlanoLabel }}</h3>
+      <div class="card-header-titles">
+        <h3 class="cliente-pet-label">{{ nomeClientePet }}</h3>
+        <p class="plano-label">{{ tipoPlanoLabel }}</p>
+      </div>
       <span class="badge" :class="statusClass">{{ statusPagamento }}</span>
     </div>
 
@@ -46,6 +49,11 @@ import { computed } from 'vue'
 
 const props = defineProps({ pacote: { type: Object, required: true } })
 defineEmits(['pagar', 'detalhes'])
+
+const nomeClientePet = computed(() => {
+  const partes = [props.pacote.cliente_nome, props.pacote.pet_nome].filter(Boolean)
+  return partes.length ? partes.join(' - ') : ''
+})
 
 const tipoPlanoLabel = computed(() => ({
   semanal: '📅 Semanal (4×/mês)',
@@ -99,11 +107,16 @@ function formatarData(data) { return new Date(data).toLocaleDateString('pt-BR') 
 .pacote-card.inativo { opacity: 0.6; background: var(--creme); }
 
 .card-header {
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 0.6rem;
   padding: 1rem 1.2rem 0.8rem;
   border-bottom: 2px solid var(--creme-escuro);
 }
-.plano-label { font-size: 0.95rem; font-weight: 800; color: var(--marrom); margin: 0; }
+.card-header-titles { min-width: 0; }
+.cliente-pet-label {
+  font-size: 0.95rem; font-weight: 800; color: var(--marrom); margin: 0 0 0.2rem;
+}
+.plano-label { font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin: 0; }
 
 .badge {
   padding: 3px 10px; border-radius: 5px;

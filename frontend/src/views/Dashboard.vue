@@ -19,70 +19,74 @@
       </div>
     </div>
 
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon">👥</div>
-        <div class="stat-value">{{ totalClientesFiltrado }}</div>
-        <div class="stat-label">Clientes</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">🐕</div>
-        <div class="stat-value">{{ totalCachorrosFiltrado }}</div>
-        <div class="stat-label">Cachorros</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">📦</div>
-        <div class="stat-value">{{ pacotesAtivosFiltrados.length }}</div>
-        <div class="stat-label">Pacotes Ativos</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">💰</div>
-        <div class="stat-value">R$ {{ formatarValor(receitaPrevistaFiltrada) }}</div>
-        <div class="stat-label">Receita Prevista</div>
-      </div>
-    </div>
+    <div class="dashboard-main-grid">
+      <div class="dashboard-col-left">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon">👥</div>
+            <div class="stat-value">{{ totalClientesFiltrado }}</div>
+            <div class="stat-label">Clientes</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">🐕</div>
+            <div class="stat-value">{{ totalCachorrosFiltrado }}</div>
+            <div class="stat-label">Cachorros</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">📦</div>
+            <div class="stat-value">{{ pacotesAtivosFiltrados.length }}</div>
+            <div class="stat-label">Pacotes Ativos</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">💰</div>
+            <div class="stat-value">R$ {{ formatarValor(receitaPrevistaFiltrada) }}</div>
+            <div class="stat-label">Receita Prevista</div>
+          </div>
+        </div>
 
-    <div class="grid-2">
-      <div class="card">
-        <div class="card-title"><span class="card-title-bar"></span>📅 Calendário de Banhos</div>
-        <CalendarioMes :banhos="agendamentosStore.agendamentosDashboard" @data-selecionada="onDataSelecionada" />
-      </div>
-
-      <div class="card">
-      <div class="card-header-row">
-        <div class="card-title" style="margin-bottom:0"><span class="card-title-bar"></span>📋 Agendamentos — {{ formatarData(dataSelecionada) }}</div>
-        <div class="ag-header-actions">
-          <select v-model="turnoFiltro" @change="carregarAgendamentos()" class="select-turno">
-            <option value="todos">Todos os turnos</option>
-            <option value="manha">Manhã</option>
-            <option value="tarde">Tarde</option>
-          </select>
-          <button @click="carregarAgendamentos()" class="btn-refresh">↻ Atualizar</button>
+        <div class="card">
+          <div class="card-title"><span class="card-title-bar"></span>📅 Calendário de Banhos</div>
+          <CalendarioMes :banhos="agendamentosStore.agendamentosDashboard" @data-selecionada="onDataSelecionada" />
         </div>
       </div>
-      <div v-if="agendamentosStore.agendamentosDashboard.length === 0" class="empty-state">
-        Nenhum agendamento nesta data. Clique no calendário para ver outros dias.
-      </div>
-      <div v-else class="agendamentos-list">
-        <div
-          v-for="ag in agendamentosStore.agendamentosDashboard"
-          :key="ag.id"
-          class="ag-card"
-          :class="ag.status_presenca"
-          @click="editarAgendamento(ag)"
-        >
-          <div class="ag-header">
-            <div>
-              <h4 class="ag-pet">{{ ag.pet_nome }}</h4>
-              <p class="ag-cliente">{{ ag.cliente_nome }}</p>
+
+      <div class="dashboard-col-right">
+        <div class="card card-agendamentos">
+          <div class="card-header-row">
+            <div class="card-title" style="margin-bottom:0"><span class="card-title-bar"></span>📋 Agendamentos — {{ formatarData(dataSelecionada) }}</div>
+            <div class="ag-header-actions">
+              <select v-model="turnoFiltro" @change="carregarAgendamentos()" class="select-turno">
+                <option value="todos">Todos os turnos</option>
+                <option value="manha">Manhã</option>
+                <option value="tarde">Tarde</option>
+              </select>
+              <button @click="carregarAgendamentos()" class="btn-refresh">↻ Atualizar</button>
             </div>
-            <span class="status-badge" :class="`status-${ag.status_presenca}`">
-              {{ ag.status_presenca.toUpperCase() }}
-            </span>
+          </div>
+          <div v-if="agendamentosStore.agendamentosDashboard.length === 0" class="empty-state">
+            Nenhum agendamento nesta data. Clique no calendário para ver outros dias.
+          </div>
+          <div v-else class="agendamentos-list">
+            <div
+              v-for="ag in agendamentosStore.agendamentosDashboard"
+              :key="ag.id"
+              class="ag-card"
+              :class="ag.status_presenca"
+              @click="editarAgendamento(ag)"
+            >
+              <div class="ag-header">
+                <div>
+                  <h4 class="ag-pet">{{ ag.pet_nome }}</h4>
+                  <p class="ag-cliente">{{ ag.cliente_nome }}</p>
+                </div>
+                <span class="status-badge" :class="`status-${ag.status_presenca}`">
+                  {{ ag.status_presenca.toUpperCase() }}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
     </div>
 
     <div class="card">
@@ -393,17 +397,50 @@ onMounted(async () => {
 }
 .periodo-ate { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; }
 
-/* STATS */
+/* LAYOUT PRINCIPAL: KPIs + Calendário à esquerda, Agendamentos à direita (altura total) */
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.2rem;
+  margin-bottom: 1.2rem;
+  align-items: stretch;
+}
+.dashboard-col-left {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+.dashboard-col-right {
+  display: flex;
+  flex-direction: column;
+}
+.dashboard-col-left .card,
+.dashboard-col-right .card {
+  margin-bottom: 0;
+}
+.card-agendamentos {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 480px;
+}
+.card-agendamentos .empty-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* STATS (compactos, 2 por linha) */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
 }
 .stat-card {
   background: var(--white);
   border-radius: var(--radius);
-  padding: 1.4rem 1rem;
+  padding: 0.9rem 0.7rem;
   text-align: center;
   box-shadow: var(--shadow);
   border-top: 4px solid var(--dourado);
@@ -413,12 +450,11 @@ onMounted(async () => {
 .stat-card:nth-child(3) { border-top-color: var(--marrom-claro); }
 .stat-card:nth-child(4) { border-top-color: var(--verde-claro); }
 .stat-card:hover { transform: translateY(-3px); }
-.stat-icon { font-size: 1.8rem; margin-bottom: 0.4rem; }
-.stat-value { font-size: 1.9rem; font-weight: 800; color: var(--marrom); line-height: 1.1; }
-.stat-label { color: var(--text-muted); font-size: 0.82rem; font-weight: 700; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-icon { font-size: 1.3rem; margin-bottom: 0.25rem; }
+.stat-value { font-size: 1.25rem; font-weight: 800; color: var(--marrom); line-height: 1.1; }
+.stat-label { color: var(--text-muted); font-size: 0.68rem; font-weight: 700; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.4px; }
 
 /* GRID */
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin-bottom: 1.2rem; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
 
 /* CARD */
@@ -500,7 +536,14 @@ onMounted(async () => {
 }
 
 /* AGENDAMENTOS */
-.agendamentos-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.agendamentos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+}
 .ag-card {
   background: var(--creme);
   border: 1px solid var(--creme-escuro);
@@ -572,4 +615,9 @@ onMounted(async () => {
 .btn-primario:hover { background: var(--marrom-medio); }
 .btn-cancelar { background: var(--creme-escuro); color: var(--marrom); flex: 1; }
 .btn-cancelar:hover { background: #e0d5c2; }
+
+@media (max-width: 900px) {
+  .dashboard-main-grid { grid-template-columns: 1fr; }
+  .card-agendamentos { min-height: 320px; }
+}
 </style>

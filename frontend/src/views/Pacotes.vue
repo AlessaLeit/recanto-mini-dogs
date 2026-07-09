@@ -16,6 +16,17 @@
     </div>
 
     <div class="filters-bar" v-if="!cachorroId">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input
+          v-model="buscaCliente"
+          type="text"
+          class="search-input"
+          placeholder="Buscar por cliente..."
+          aria-label="Buscar por cliente"
+        />
+        <button v-if="buscaCliente" @click="buscaCliente = ''" class="search-clear" title="Limpar busca">✕</button>
+      </div>
       <select v-model="filtroStatus" class="filter-select" aria-label="Filtrar por status do pacote">
         <option value="ativos">Pacotes Ativos</option>
         <option value="inativos">Pacotes Inativos</option>
@@ -41,6 +52,7 @@
       />
       <div v-if="pacotesFiltrados.length === 0" class="empty-state">
         <p v-if="cachorroId">Nenhum pacote encontrado para este cachorro.</p>
+        <p v-else-if="buscaCliente">Nenhum pacote encontrado para "{{ buscaCliente }}".</p>
         <p v-else>Nenhum pacote cadastrado.</p>
       </div>
     </div>
@@ -126,6 +138,7 @@ const showPagamento = ref(false)
 const pacoteSelecionado = ref(null)
 const filtroStatus = ref('ativos')
 const filtroPagamento = ref('todos')
+const buscaCliente = ref('')
 
 const novoPacote = ref({ 
   cachorro_id: null, 
@@ -155,6 +168,8 @@ const pacotesFiltrados = computed(() => {
   if (filtroStatus.value === 'ativos') lista = lista.filter(p => p.ativo)
   else if (filtroStatus.value === 'inativos') lista = lista.filter(p => !p.ativo)
   if (filtroPagamento.value !== 'todos') lista = lista.filter(p => p.status_pagamento === filtroPagamento.value)
+  const busca = buscaCliente.value.trim().toLowerCase()
+  if (busca) lista = lista.filter(p => p.cliente_nome?.toLowerCase().includes(busca))
   return lista
 })
 
@@ -232,7 +247,7 @@ onMounted(async () => {
 .header-btns { display: flex; gap: 0.6rem; }
 
 /* FILTROS */
-.filters-bar { display: flex; gap: 0.75rem; margin-bottom: 1.2rem; }
+.filters-bar { display: flex; gap: 0.75rem; margin-bottom: 1.2rem; flex-wrap: wrap; }
 .filter-select {
   padding: 0.6rem 0.9rem;
   border: 2px solid var(--creme-escuro); border-radius: 8px;
@@ -240,6 +255,39 @@ onMounted(async () => {
   cursor: pointer; transition: border-color 0.15s;
 }
 .filter-select:focus { border-color: var(--dourado); outline: none; }
+
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 240px;
+  max-width: 320px;
+}
+.search-icon {
+  position: absolute;
+  left: 0.75rem;
+  font-size: 0.9rem;
+  opacity: 0.6;
+  pointer-events: none;
+}
+.search-input {
+  width: 100%;
+  padding: 0.6rem 2rem 0.6rem 2.2rem;
+  border: 2px solid var(--creme-escuro); border-radius: 8px;
+  background: var(--creme); color: var(--text); font-size: 0.9rem;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+.search-input:focus { border-color: var(--dourado); outline: none; }
+.search-clear {
+  position: absolute;
+  right: 0.6rem;
+  border: none; background: none; cursor: pointer;
+  color: var(--text-muted); font-size: 0.85rem; font-weight: 700;
+  padding: 0.2rem;
+  line-height: 1;
+}
+.search-clear:hover { color: var(--marrom); }
 
 /* GRID */
 .grid-3 { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.2rem; }
