@@ -42,6 +42,30 @@ class AgendamentoCreate(AgendamentoBase):
     "Schema para criar agendamento (requer pacote_id)"
     pacote_id: int = Field(..., gt=0, description="ID do pacote")
 
+
+class AgendamentoAvulsoCreate(BaseModel):
+    "Schema para criar um banho avulso (sem pacote vinculado)"
+    pet_nome_avulso: str = Field(..., min_length=1, description="Nome do cachorro")
+    cliente_nome_avulso: str = Field(..., min_length=1, description="Nome do cliente")
+    data_banho: date = Field(..., description="Data do banho")
+    turno: Literal["manha", "tarde"] = Field(default="manha", description="Turno do banho")
+    valor_avulso: float = Field(..., ge=0, description="Valor cobrado pelo banho avulso")
+    observacao: Optional[str] = Field(default=None, description="Ex: Tosa higiênica (deixe em branco se for só banho)")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "pet_nome_avulso": "Rex",
+                "cliente_nome_avulso": "Maria Silva",
+                "data_banho": "2026-07-15",
+                "turno": "manha",
+                "valor_avulso": 60.0,
+                "observacao": "Tosa higiênica"
+            }
+        }
+    )
+
+
 class AgendamentoUpdate(BaseModel):
     "Schema para edição (retroativa permitida)"
     status_presenca: Optional[Literal["pendente", "concluido", "faltou"]] = None
@@ -60,7 +84,10 @@ class AgendamentoUpdate(BaseModel):
 class AgendamentoResponse(AgendamentoBase):
     "Schema de resposta completa"
     id: int
-    pacote_id: int
+    pacote_id: Optional[int] = None
+    pet_nome_avulso: Optional[str] = None
+    cliente_nome_avulso: Optional[str] = None
+    valor_avulso: Optional[float] = None
     registrado_em: datetime
     atualizado_em: Optional[datetime] = None
 

@@ -32,6 +32,13 @@ class StatusPagamento(str, Enum):
     ATRASADO = "atrasado"
 
 
+class CachorroPacoteResponse(BaseModel):
+    id: int
+    nome: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class PagamentoResponse(BaseModel):
     id: int
     pacote_id: int
@@ -62,7 +69,11 @@ class PacoteBase(BaseModel):
 
 
 class PacoteCreate(BaseModel):
-    cachorro_id: int = Field(..., gt=0)
+    cachorro_id: int = Field(..., gt=0, description="Cachorro principal do pacote")
+    cachorros_adicionais_ids: List[int] = Field(
+        default_factory=list,
+        description="Outros cachorros do mesmo cliente incluídos neste pacote"
+    )
     tipo_plano: TipoPlano
 
     dia_da_semana: Optional[DiaSemana] = None
@@ -83,6 +94,7 @@ class PacoteUpdate(BaseModel):
     valor_transporte: Optional[float] = None
     limite_banhos_mes: Optional[int] = None
     ativo: Optional[bool] = None
+    cachorros_adicionais_ids: Optional[List[int]] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -105,13 +117,19 @@ class PacoteResponse(BaseModel):
 
     pet_nome: Optional[str] = None
     cliente_nome: Optional[str] = None
+    cachorros: List[CachorroPacoteResponse] = Field(default_factory=list, validation_alias="cachorros_todos")
     status_pagamento: str
 
     limite_banhos_mes: int
     total_agendamentos: int
     agendamentos: List[AgendamentoResponse] = []
 
-    model_config = ConfigDict(from_attributes=True)
+    # populate_by_name=True: o endpoint valida o pacote 2x (uma vez manualmente
+    # via model_validate(orm_obj).model_dump(), depois de novo pelo response_model
+    # do FastAPI sobre o dict resultante). Na 2ª passada o input já é um dict com
+    # a chave 'cachorros' (não 'cachorros_todos'), e sem populate_by_name a busca
+    # por alias falha silenciosamente e cai no default [].
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     @model_validator(mode="after")
     def _calcular_valor_pago(self):

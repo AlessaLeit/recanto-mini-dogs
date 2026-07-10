@@ -67,23 +67,27 @@
             Nenhum agendamento nesta data. Clique no calendário para ver outros dias.
           </div>
           <div v-else class="agendamentos-list">
-            <div
-              v-for="ag in agendamentosStore.agendamentosDashboard"
-              :key="ag.id"
-              class="ag-card"
-              :class="ag.status_presenca"
-              @click="editarAgendamento(ag)"
-            >
-              <div class="ag-header">
-                <div>
-                  <h4 class="ag-pet">{{ ag.pet_nome }}</h4>
-                  <p class="ag-cliente">{{ ag.cliente_nome }}</p>
-                </div>
-                <span class="status-badge" :class="`status-${ag.status_presenca}`">
-                  {{ ag.status_presenca.toUpperCase() }}
-                </span>
+            <template v-for="entry in agendamentosExibicao" :key="entry.tipo === 'divider' ? `divider-${entry.turno}` : entry.ag.id">
+              <div v-if="entry.tipo === 'divider'" class="turno-divider">
+                <span>{{ entry.turno === 'tarde' ? '🌇 Tarde' : '🌅 Manhã' }}</span>
               </div>
-            </div>
+              <div
+                v-else
+                class="ag-card"
+                :class="entry.ag.status_presenca"
+                @click="editarAgendamento(entry.ag)"
+              >
+                <div class="ag-header">
+                  <div>
+                    <h4 class="ag-pet">{{ entry.ag.pet_nome }}</h4>
+                    <p class="ag-cliente">{{ entry.ag.cliente_nome }}</p>
+                  </div>
+                  <span class="status-badge" :class="`status-${entry.ag.status_presenca}`">
+                    {{ entry.ag.status_presenca.toUpperCase() }}
+                  </span>
+                </div>
+              </div>
+            </template>
           </div>
         </div>
       </div>
@@ -175,6 +179,23 @@ const agEdit = ref(null)
 const showPagamento = ref(false)
 const pacoteSelecionado = ref(null)
 const turnoFiltro = ref('todos')
+
+// Quando o filtro é "todos", agrupa manhã primeiro e tarde depois, com um
+// separador entre os dois grupos (sem separador se algum grupo estiver vazio).
+const agendamentosExibicao = computed(() => {
+  const lista = agendamentosStore.agendamentosDashboard
+  if (turnoFiltro.value !== 'todos') {
+    return lista.map(ag => ({ tipo: 'item', ag }))
+  }
+  const manha = lista.filter(ag => ag.turno !== 'tarde')
+  const tarde = lista.filter(ag => ag.turno === 'tarde')
+  const resultado = manha.map(ag => ({ tipo: 'item', ag }))
+  if (manha.length && tarde.length) {
+    resultado.push({ tipo: 'divider', turno: 'tarde' })
+  }
+  resultado.push(...tarde.map(ag => ({ tipo: 'item', ag })))
+  return resultado
+})
 
 // Filtro de período dos cards de estatística do topo
 const statsFiltro = ref('mes')
@@ -543,6 +564,24 @@ onMounted(async () => {
   flex: 1;
   overflow-y: auto;
   padding-right: 4px;
+}
+.turno-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.2rem 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.turno-divider::before,
+.turno-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--creme-escuro);
 }
 .ag-card {
   background: var(--creme);

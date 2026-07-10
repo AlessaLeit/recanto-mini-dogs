@@ -3,10 +3,44 @@ import agendamentosApi from '../api/agendamentos.js'
 
 export const useAgendamentosStore = defineStore('agendamentos', {
   state: () => ({
-    agendamentosDashboard: []
+    agendamentosDashboard: [],
+    avulsos: []
   }),
-  
+
   actions: {
+    async fetchAvulsos() {
+      try {
+        const response = await agendamentosApi.listarAvulsos()
+        this.avulsos = Array.isArray(response.data) ? response.data : []
+        return this.avulsos
+      } catch (error) {
+        console.error('Erro ao carregar banhos avulsos:', error)
+        this.avulsos = []
+        throw error
+      }
+    },
+
+    async criarAvulso(dados) {
+      try {
+        const response = await agendamentosApi.criarAvulso(dados)
+        this.avulsos.unshift(response.data)
+        return response.data
+      } catch (error) {
+        console.error('Erro ao criar banho avulso:', error)
+        throw error
+      }
+    },
+
+    async deletarAvulso(agendamentoId) {
+      try {
+        await agendamentosApi.deletarAgendamento(agendamentoId)
+        this.avulsos = this.avulsos.filter(a => a.id !== agendamentoId)
+      } catch (error) {
+        console.error('Erro ao excluir banho avulso:', error)
+        throw error
+      }
+    },
+
     async fetchDashboard(data = null, turno = null) {
       try {
         const response = await agendamentosApi.listarDashboard(data, turno)

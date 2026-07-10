@@ -20,6 +20,8 @@ router = APIRouter(
 @router.get("/", response_model=List[schemas.PacoteResponse])
 def listar_pacotes(
     incluir_inativos: bool = Query(False, description="Incluir pacotes inativos?"),
+    cachorro_id: Optional[int] = Query(None, description="Filtra pacotes de um cachorro específico"),
+    cliente_id: Optional[int] = Query(None, description="Filtra pacotes de todos os cachorros de um cliente"),
     db: Session = Depends(get_db)
 ):
     """Lista pacotes (ativos por padrão; usa incluir_inativos=true para todos)."""
@@ -32,6 +34,12 @@ def listar_pacotes(
         # Usamos filter(or_...) caso existam registros legados com 'ativo' como NULL
         from sqlalchemy import or_
         query = query.filter(or_(models.Pacote.ativo == True, models.Pacote.ativo == None))
+
+    if cachorro_id:
+        query = query.filter(models.Pacote.cachorro_id == cachorro_id)
+
+    if cliente_id:
+        query = query.join(models.Cachorro).filter(models.Cachorro.cliente_id == cliente_id)
 
     pacotes = query.all()
 
@@ -52,7 +60,8 @@ def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Session = Depends(get_d
     dados_pacote = pacote_criar.model_dump()
     dados_pacote.pop('limite_banhos_mes', None)
     dados_pacote.pop('status_pagamento', None)
-    
+    cachorros_adicionais_ids = dados_pacote.pop('cachorros_adicionais_ids', [])
+
     # Garante que o dia da semana não seja nulo (correção IntegrityError)
     if not dados_pacote.get('dia_da_semana'):
         dados_pacote['dia_da_semana'] = pacote_criar.dia_da_semana or "terca"
@@ -65,7 +74,25 @@ def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Session = Depends(get_d
     if 'ativo' not in dados_pacote:
         dados_pacote['ativo'] = True
 
+    # Cachorros adicionais precisam ser do mesmo cliente do cachorro principal,
+    # para manter cliente_nome e o fechamento/pagamento do pacote sem ambiguidade.
+    cachorros_extras = []
+    if cachorros_adicionais_ids:
+        ids_unicos = {i for i in cachorros_adicionais_ids if i != cachorro.id}
+        if ids_unicos:
+            cachorros_extras = db.query(models.Cachorro).filter(
+                models.Cachorro.id.in_(ids_unicos),
+                models.Cachorro.cliente_id == cachorro.cliente_id
+            ).all()
+            if len(cachorros_extras) != len(ids_unicos):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Todos os cachorros adicionais devem pertencer ao mesmo cliente do cachorro principal"
+                )
+
     db_pacote = models.Pacote(**dados_pacote)
+    if cachorros_extras:
+        db_pacote.cachorros_adicionais = cachorros_extras
     db.add(db_pacote)
     db.commit()
     db.refresh(db_pacote)
@@ -180,9 +207,25 @@ def atualizar_pacote(pacote_id: int, pacote_atualizar: schemas.PacoteUpdate, db:
         raise HTTPException(status_code=404, detail="Pacote não encontrado")
     
     update_data = pacote_atualizar.model_dump(exclude_unset=True)
+    cachorros_adicionais_ids = update_data.pop('cachorros_adicionais_ids', None)
     for field, value in update_data.items():
         setattr(pacote, field, value)
-    
+
+    if cachorros_adicionais_ids is not None:
+        ids_unicos = {i for i in cachorros_adicionais_ids if i != pacote.cachorro_id}
+        cachorros_extras = []
+        if ids_unicos:
+            cachorros_extras = db.query(models.Cachorro).filter(
+                models.Cachorro.id.in_(ids_unicos),
+                models.Cachorro.cliente_id == pacote.cachorro.cliente_id
+            ).all()
+            if len(cachorros_extras) != len(ids_unicos):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Todos os cachorros adicionais devem pertencer ao mesmo cliente do cachorro principal"
+                )
+        pacote.cachorros_adicionais = cachorros_extras
+
     db.commit()
     db.refresh(pacote)
 

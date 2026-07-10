@@ -2,12 +2,23 @@
 Model Pacote - Representa um plano de banhos contratado.
 Um pacote pode ter múltiplos banhos e pagamentos registrados.
 """
-from sqlalchemy import String, Text, Float, ForeignKey, Boolean, DateTime, Date, func, Enum
+from sqlalchemy import String, Text, Float, ForeignKey, Boolean, DateTime, Date, func, Enum, Table, Column, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 from typing import List, Optional, Literal
 from datetime import datetime, date
 import enum
+
+
+# Tabela associativa: cachorros adicionais de um pacote (além do cachorro
+# principal em Pacote.cachorro_id). Permite fechar um único pacote/pagamento
+# para vários cachorros da mesma família.
+pacote_cachorros_extras = Table(
+    "pacote_cachorros_extras",
+    Base.metadata,
+    Column("pacote_id", Integer, ForeignKey("pacotes.id", ondelete="CASCADE"), primary_key=True),
+    Column("cachorro_id", Integer, ForeignKey("cachorros.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class TipoPlano(str, enum.Enum):
@@ -81,8 +92,15 @@ class Pacote(Base):
     )
     
     # Relacionamentos
-    cachorro: Mapped["Cachorro"] = relationship(back_populates="pacotes")
-    
+    cachorro: Mapped["Cachorro"] = relationship(back_populates="pacotes", foreign_keys=[cachorro_id])
+
+    # Cachorros adicionais (além do principal) incluídos neste pacote — permite
+    # fechar/pagar de uma vez só vários cachorros da mesma família.
+    cachorros_adicionais: Mapped[List["Cachorro"]] = relationship(
+        secondary=pacote_cachorros_extras,
+        lazy="selectin"
+    )
+
     # Um pacote contém múltiplos agendamentos, pagamentos e banhos (legado)
     agendamentos: Mapped[List["Agendamento"]] = relationship(
         back_populates="pacote",
@@ -148,9 +166,18 @@ class Pacote(Base):
         return len(self.agendamentos) if self.agendamentos else 0
 
     @property
+    def cachorros_todos(self) -> List["Cachorro"]:
+        """Cachorro principal + cachorros adicionais (pacotes multi-cachorro)."""
+        todos = [self.cachorro] if self.cachorro else []
+        principal_id = self.cachorro.id if self.cachorro else None
+        todos += [c for c in (self.cachorros_adicionais or []) if c.id != principal_id]
+        return todos
+
+    @property
     def pet_nome(self) -> Optional[str]:
-        """Retorna o nome do pet vinculado"""
-        return self.cachorro.nome if self.cachorro else None
+        """Retorna o(s) nome(s) do(s) pet(s) vinculado(s), separados por vírgula"""
+        nomes = [c.nome for c in self.cachorros_todos if c and c.nome]
+        return ", ".join(nomes) if nomes else None
 
     @property
     def cliente_nome(self) -> Optional[str]:
@@ -172,8 +199,9 @@ class Pacote(Base):
             "fechado": self.fechado,
             "ativo": self.ativo,
             "criado_em": self.criado_em.isoformat() if self.criado_em else None,
-            "pet_nome": self.cachorro.nome if self.cachorro else None,
-            "cliente_nome": self.cachorro.cliente.nome if self.cachorro and self.cachorro.cliente else None,
+            "pet_nome": self.pet_nome,
+            "cliente_nome": self.cliente_nome,
+            "cachorros": [{"id": c.id, "nome": c.nome} for c in self.cachorros_todos],
             "status_pagamento": self.status_pagamento,
             "limite_banhos_mes": self.limite_banhos_mes,
             "total_agendamentos": self.total_agendamentos,

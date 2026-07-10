@@ -9,6 +9,8 @@ import Clientes from '../views/Clientes.vue'
 import Relatorios from '../views/Relatorios.vue'
 import Login from '../views/Login.vue'
 import PacoteDetail from '../views/PacoteDetail.vue'
+import BanhosAvulsos from '../views/BanhosAvulsos.vue'
+import ClienteDetail from '../views/ClienteDetail.vue'
 import { useAuthStore } from '../stores/auth'
 
 const routes = [
@@ -39,9 +41,19 @@ const routes = [
     component: Relatorios
   },
   {
+    path: '/banhos-avulsos',
+    name: 'BanhosAvulsos',
+    component: BanhosAvulsos
+  },
+  {
     path: '/pacotes/:id',
     name: 'PacoteDetail',
     component: PacoteDetail
+  },
+  {
+    path: '/clientes/:id',
+    name: 'ClienteDetail',
+    component: ClienteDetail
   }
 ]
 

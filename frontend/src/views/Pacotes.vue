@@ -6,7 +6,7 @@
         <h1 class="page-title" v-else>Gerenciamento de Pacotes</h1>
       </div>
       <div class="header-btns">
-        <button @click="showNovoPacote = true" class="btn btn-primario" v-if="!cachorroId || (cachorroId && cachorros.length)">
+        <button @click="abrirNovoPacote" class="btn btn-primario" v-if="!cachorroId || (cachorroId && cachorros.length)">
           + Novo Pacote
         </button>
         <button v-if="cachorroId" @click="voltarTodosPacotes" class="btn btn-ghost">
@@ -64,14 +64,49 @@
         <h3 class="modal-title" v-if="cachorroId">Novo Pacote — {{ cachorroSelecionado?.nome }}</h3>
         <h3 class="modal-title" v-else>Novo Pacote</h3>
         <form @submit.prevent="criarPacote">
-          <div class="form-group">
+          <div class="form-group" v-if="cachorroId">
             <label for="novo-cachorro">Cachorro</label>
-            <select id="novo-cachorro" v-model="novoPacote.cachorro_id" required>
-              <option v-if="cachorroId" :value="cachorroId" selected>{{ cachorroSelecionado?.nome }} (pré-selecionado)</option>
-              <option v-else v-for="cachorro in cachorros" :key="cachorro.id" :value="cachorro.id">
-                {{ cachorro.nome }} ({{ cachorro.cliente?.nome }})
-              </option>
-            </select>
+            <input id="novo-cachorro" :value="`${cachorroSelecionado?.nome || ''} (pré-selecionado)`" disabled />
+          </div>
+          <div class="form-group" v-else>
+            <label for="novo-cachorro">Cachorro</label>
+            <div class="autocomplete">
+              <input
+                id="novo-cachorro"
+                v-model="buscaCachorroNovo"
+                type="text"
+                autocomplete="off"
+                placeholder="Digite o nome do cachorro ou do cliente..."
+                @focus="mostrarListaCachorro = true"
+                @input="onDigitarCachorroNovo"
+                @blur="onBlurCachorroNovo"
+                required
+              />
+              <div v-if="mostrarListaCachorro" class="autocomplete-lista">
+                <div
+                  v-for="cachorro in cachorrosFiltradosNovo"
+                  :key="cachorro.id"
+                  class="autocomplete-item"
+                  @mousedown.prevent="selecionarCachorroNovo(cachorro)"
+                >
+                  {{ cachorro.nome }} <span class="autocomplete-sub">({{ cachorro.cliente?.nome }})</span>
+                </div>
+                <div v-if="cachorrosFiltradosNovo.length === 0" class="autocomplete-empty">Nenhum cachorro encontrado</div>
+              </div>
+            </div>
+          </div>
+          <div class="form-group" v-if="outrosCachorrosDoCliente.length">
+            <label>Outros cachorros do mesmo cliente (opcional)</label>
+            <div class="checkbox-lista">
+              <label v-for="cachorro in outrosCachorrosDoCliente" :key="cachorro.id" class="checkbox-item">
+                <input
+                  type="checkbox"
+                  :value="cachorro.id"
+                  v-model="novoPacote.cachorros_adicionais_ids"
+                />
+                {{ cachorro.nome }}
+              </label>
+            </div>
           </div>
           <div class="form-group">
             <label for="novo-tipo-plano">Tipo de Plano</label>
@@ -139,14 +174,17 @@ const pacoteSelecionado = ref(null)
 const filtroStatus = ref('ativos')
 const filtroPagamento = ref('todos')
 const buscaCliente = ref('')
+const buscaCachorroNovo = ref('')
+const mostrarListaCachorro = ref(false)
 
-const novoPacote = ref({ 
-  cachorro_id: null, 
-  tipo_plano: 'semanal', 
+const novoPacote = ref({
+  cachorro_id: null,
+  cachorros_adicionais_ids: [],
+  tipo_plano: 'semanal',
   dia_da_semana: 'terca',
-  valor_banho_base: 0, 
-  valor_transporte: 0, 
-  valor_cobrado: 0 
+  valor_banho_base: 0,
+  valor_transporte: 0,
+  valor_cobrado: 0
 })
 
 const cachorroId = computed(() => {
@@ -163,6 +201,14 @@ const cachorros = computed(() => {
   return lista
 })
 const cachorroSelecionado = computed(() => cachorros.value.find(d => d.id === cachorroId.value))
+
+// Outros cachorros do mesmo cliente do cachorro principal escolhido (pré-selecionado
+// via rota ou pelo autocomplete), para permitir fechar um único pacote para vários pets.
+const outrosCachorrosDoCliente = computed(() => {
+  const principal = cachorros.value.find(d => d.id === novoPacote.value.cachorro_id)
+  if (!principal || !principal.cliente) return []
+  return cachorros.value.filter(d => d.cliente?.id === principal.cliente.id && d.id !== principal.id)
+})
 const pacotesFiltrados = computed(() => {
   let lista = pacotesStore.pacotes
   if (filtroStatus.value === 'ativos') lista = lista.filter(p => p.ativo)
@@ -172,6 +218,40 @@ const pacotesFiltrados = computed(() => {
   if (busca) lista = lista.filter(p => p.cliente_nome?.toLowerCase().includes(busca))
   return lista
 })
+
+const cachorrosFiltradosNovo = computed(() => {
+  const termo = buscaCachorroNovo.value.trim().toLowerCase()
+  if (!termo) return cachorros.value
+  return cachorros.value.filter(c =>
+    c.nome.toLowerCase().includes(termo) || (c.cliente?.nome || '').toLowerCase().includes(termo)
+  )
+})
+
+function abrirNovoPacote() {
+  buscaCachorroNovo.value = ''
+  mostrarListaCachorro.value = false
+  novoPacote.value.cachorros_adicionais_ids = []
+  showNovoPacote.value = true
+}
+
+function selecionarCachorroNovo(cachorro) {
+  novoPacote.value.cachorro_id = cachorro.id
+  novoPacote.value.cachorros_adicionais_ids = []
+  buscaCachorroNovo.value = `${cachorro.nome} (${cachorro.cliente?.nome || ''})`
+  mostrarListaCachorro.value = false
+}
+
+function onDigitarCachorroNovo() {
+  // Se o texto foi alterado, invalida a seleção até escolher um item da lista de novo.
+  novoPacote.value.cachorro_id = null
+  novoPacote.value.cachorros_adicionais_ids = []
+  mostrarListaCachorro.value = true
+}
+
+function onBlurCachorroNovo() {
+  // Pequeno atraso para permitir que o clique num item da lista seja processado antes de fechar.
+  setTimeout(() => { mostrarListaCachorro.value = false }, 150)
+}
 
 function calcularSugeridoNovo() {
   const qtd = novoPacote.value.tipo_plano === 'semanal' ? 4 : (novoPacote.value.tipo_plano === 'quinzenal' ? 2 : 1)
@@ -196,6 +276,10 @@ async function confirmarPagamento(dados) {
   } catch (err) { alert('Erro: ' + err) }
 }
 async function criarPacote() {
+  if (!novoPacote.value.cachorro_id) {
+    alert('Selecione um cachorro válido na lista.')
+    return
+  }
   if (novoPacote.value.valor_cobrado <= 0 || novoPacote.value.valor_banho_base <= 0) {
     alert('O valor do banho e o valor total devem ser maiores que zero.')
     return
@@ -205,7 +289,8 @@ async function criarPacote() {
     await pacotesStore.criarPacote(novoPacote.value)
     showNovoPacote.value = false
     // Resetar formulário
-    novoPacote.value = { cachorro_id: null, tipo_plano: 'semanal', dia_da_semana: 'terca', valor_banho_base: 0, valor_transporte: 0, valor_cobrado: 0 }
+    novoPacote.value = { cachorro_id: null, cachorros_adicionais_ids: [], tipo_plano: 'semanal', dia_da_semana: 'terca', valor_banho_base: 0, valor_transporte: 0, valor_cobrado: 0 }
+    buscaCachorroNovo.value = ''
   } catch (err) { alert('Erro ao criar pacote: ' + err) }
 }
 function verDetalhes(pacote) { router.push(`/pacotes/${pacote.id}`) }
@@ -331,6 +416,31 @@ onMounted(async () => {
 }
 .form-group input:focus,
 .form-group select:focus { border-color: var(--dourado); outline: none; }
+.form-group input:disabled { opacity: 0.7; cursor: not-allowed; }
 .form-actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
 .form-actions .btn { flex: 1; }
+
+/* AUTOCOMPLETE DE CACHORRO */
+.autocomplete { position: relative; }
+.autocomplete-lista {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--white); border: 2px solid var(--creme-escuro); border-radius: 7px;
+  box-shadow: 0 6px 20px rgba(59,42,26,0.18);
+  max-height: 220px; overflow-y: auto; z-index: 10;
+}
+.autocomplete-item {
+  padding: 0.6rem 0.75rem; font-size: 0.92rem; color: var(--text); cursor: pointer;
+}
+.autocomplete-item:hover { background: var(--dourado-claro); }
+.autocomplete-sub { color: var(--text-muted); font-size: 0.82rem; }
+.autocomplete-empty { padding: 0.6rem 0.75rem; font-size: 0.88rem; color: var(--text-muted); font-style: italic; }
+
+/* CHECKBOXES DE CACHORROS ADICIONAIS */
+.checkbox-lista {
+  display: flex; flex-direction: column; gap: 0.4rem;
+  border: 2px solid var(--creme-escuro); border-radius: 7px;
+  padding: 0.6rem 0.75rem; max-height: 160px; overflow-y: auto;
+}
+.checkbox-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.92rem; color: var(--text); cursor: pointer; }
+.checkbox-item input[type="checkbox"] { width: auto; margin: 0; }
 </style>

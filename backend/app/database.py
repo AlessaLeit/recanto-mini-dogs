@@ -80,8 +80,13 @@ def ensure_schema_upgrades() -> None:
     """
     inspector = inspect(engine)
     colunas_novas = {
-        "agendamentos": [("turno", "VARCHAR(10) DEFAULT 'manha'")],
-        "cachorros": [("criado_em", "TIMESTAMP")],
+        "agendamentos": [
+            ("turno", "VARCHAR(10) DEFAULT 'manha'"),
+            ("pet_nome_avulso", "VARCHAR(100)"),
+            ("cliente_nome_avulso", "VARCHAR(100)"),
+            ("valor_avulso", "FLOAT"),
+        ],
+        "cachorros": [("criado_em", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")],
         "pagamentos": [("observacao", "TEXT")],
     }
 
@@ -97,3 +102,22 @@ def ensure_schema_upgrades() -> None:
             if nome_coluna == "criado_em":
                 with engine.begin() as conn:
                     conn.execute(text(f"UPDATE {tabela} SET criado_em = CURRENT_TIMESTAMP WHERE criado_em IS NULL"))
+
+    # 'pacote_id' precisa aceitar NULL para permitir banhos avulsos (sem pacote
+    # vinculado). SQLite não suporta ALTER COLUMN diretamente, mas como os bancos
+    # de desenvolvimento são recriados do zero isso só afeta produção (Postgres).
+    if "agendamentos" in inspector.get_table_names() and engine.dialect.name == "postgresql":
+        colunas_info = {c["name"]: c for c in inspector.get_columns("agendamentos")}
+        if colunas_info.get("pacote_id", {}).get("nullable") is False:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE agendamentos ALTER COLUMN pacote_id DROP NOT NULL"))
+
+    # 'cachorros.criado_em' foi adicionada numa migração anterior sem DEFAULT no
+    # banco (só um backfill pontual), então cachorros novos ficavam com NULL e
+    # quebravam a resposta da API. Garante DEFAULT + backfill + NOT NULL sempre,
+    # independente de a coluna já existir ou ter acabado de ser criada.
+    if "cachorros" in inspector.get_table_names() and engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE cachorros ALTER COLUMN criado_em SET DEFAULT CURRENT_TIMESTAMP"))
+            conn.execute(text("UPDATE cachorros SET criado_em = CURRENT_TIMESTAMP WHERE criado_em IS NULL"))
+            conn.execute(text("ALTER TABLE cachorros ALTER COLUMN criado_em SET NOT NULL"))

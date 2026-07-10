@@ -17,7 +17,11 @@ export const agendamentosApi = {
   atualizarStatus: (id, dados) => api.put(`/agendamentos/${id}`, dados),
 
   // Excluir agendamento do dia
-  deletarAgendamento: (id) => api.delete(`/agendamentos/${id}`)
+  deletarAgendamento: (id) => api.delete(`/agendamentos/${id}`),
+
+  // Banhos avulsos (sem pacote vinculado)
+  criarAvulso: (dados) => api.post('/agendamentos/avulso', dados),
+  listarAvulsos: () => api.get('/agendamentos/avulsos')
 }
 
 

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database import get_db
 from app.models import Agendamento
-from app.schemas import AgendamentoCreate, AgendamentoUpdate, AgendamentoResponse
+from app.schemas import AgendamentoCreate, AgendamentoUpdate, AgendamentoResponse, AgendamentoAvulsoCreate
 from app.services.pacote_service import PacoteService
 from app.models import Pacote, Cachorro, Cliente
 from datetime import date
@@ -38,6 +38,38 @@ def listar_agendamentos(pacote_id: int, db: Session = Depends(get_db)):
     ).order_by(Agendamento.data_banho).all()
     return agendamentos
 
+
+@router.post("/avulso", response_model=AgendamentoResponse, status_code=status.HTTP_201_CREATED)
+def criar_banho_avulso(dados: AgendamentoAvulsoCreate, db: Session = Depends(get_db)):
+    """
+    Cria um banho avulso (sem pacote vinculado). Entra na agenda normalmente.
+    """
+    db_ag = Agendamento(
+        pacote_id=None,
+        data_banho=dados.data_banho,
+        turno=dados.turno,
+        status_presenca="pendente",
+        pet_nome_avulso=dados.pet_nome_avulso.strip(),
+        cliente_nome_avulso=dados.cliente_nome_avulso.strip(),
+        valor_avulso=dados.valor_avulso,
+        extras={"info": dados.observacao or "", "valor_extra": 0}
+    )
+    db.add(db_ag)
+    db.commit()
+    db.refresh(db_ag)
+    return AgendamentoResponse.model_validate(db_ag).model_dump()
+
+
+@router.get("/avulsos", response_model=List[AgendamentoResponse])
+def listar_banhos_avulsos(db: Session = Depends(get_db)):
+    """
+    Lista todos os banhos avulsos (sem pacote), mais recentes primeiro.
+    """
+    agendamentos = db.query(Agendamento).filter(
+        Agendamento.pacote_id.is_(None)
+    ).order_by(Agendamento.data_banho.desc(), Agendamento.registrado_em.desc()).all()
+    return agendamentos
+
 @router.get("/dashboard/{data}")
 def listar_agendamentos_data(
     data: str,
@@ -54,8 +86,8 @@ def listar_agendamentos_data(
         target_date = date.today()
 
     query = (db.query(Agendamento)
-        .join(Pacote)
-        .outerjoin(Cachorro)
+        .outerjoin(Pacote, Agendamento.pacote_id == Pacote.id)
+        .outerjoin(Cachorro, Pacote.cachorro_id == Cachorro.id)
         .filter(Agendamento.data_banho == target_date)
     )
 
@@ -66,20 +98,27 @@ def listar_agendamentos_data(
 
     result = []
     for ag in agendamentos:
+        avulso = ag.pacote_id is None
         ag_dict = {
             "id": ag.id,
             "pacote_id": ag.pacote_id,
+            "avulso": avulso,
             "data_banho": ag.data_banho,
             "status_presenca": ag.status_presenca,
             "turno": ag.turno,
             "extras": ag.extras,
+            "valor_avulso": ag.valor_avulso,
             "registrado_em": ag.registrado_em,
             "atualizado_em": ag.atualizado_em,
-            "pet_nome": ag.pacote.cachorro.nome if ag.pacote and ag.pacote.cachorro else "Pet não encontrado",
-            "cliente_nome": (ag.pacote.cachorro.cliente.nome if ag.pacote
-                                     and ag.pacote.cachorro
-                                     and ag.pacote.cachorro.cliente
-                                     else "Cliente não encontrado")
+            "pet_nome": (ag.pet_nome_avulso or "Avulso") if avulso else (
+                ag.pacote.pet_nome if ag.pacote and ag.pacote.pet_nome else "Pet não encontrado"
+            ),
+            "cliente_nome": (ag.cliente_nome_avulso or "-") if avulso else (
+                ag.pacote.cachorro.cliente.nome if ag.pacote
+                    and ag.pacote.cachorro
+                    and ag.pacote.cachorro.cliente
+                    else "Cliente não encontrado"
+            )
         }
         result.append(ag_dict)
 

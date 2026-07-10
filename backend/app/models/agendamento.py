@@ -2,7 +2,7 @@
 Model Agendamento - Representa um agendamento de banho/tosa de um pacote.
 Permite edição retroativa de status e extras.
 """
-from sqlalchemy import Text, ForeignKey, DateTime, Date, func, JSON
+from sqlalchemy import Text, Float, String, ForeignKey, DateTime, Date, func, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import Enum as SQLEnum
 from app.database import Base
@@ -26,11 +26,17 @@ class Agendamento(Base):
     
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     
-    # Foreign Key para pacote (obrigatório, cascade delete)
-    pacote_id: Mapped[int] = mapped_column(
+    # Foreign Key para pacote (opcional: nulo para banhos avulsos sem pacote vinculado)
+    pacote_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("pacotes.id", ondelete="CASCADE"),
-        nullable=False
+        nullable=True
     )
+
+    # Campos usados apenas em banhos avulsos (pacote_id nulo): nome digitado
+    # livremente, já que o cliente/cachorro pode não estar cadastrado no sistema.
+    pet_nome_avulso: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    cliente_nome_avulso: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    valor_avulso: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     
     # Data planejada do agendamento
     data_banho: Mapped[date] = mapped_column(Date, nullable=False)
@@ -69,8 +75,8 @@ class Agendamento(Base):
     )
     
     # Relacionamentos
-    pacote: Mapped["Pacote"] = relationship(back_populates="agendamentos")
-    
+    pacote: Mapped[Optional["Pacote"]] = relationship(back_populates="agendamentos")
+
     def to_dict(self) -> dict:
         """Serialização completa para JSON/API"""
         return {
@@ -80,6 +86,9 @@ class Agendamento(Base):
             "status_presenca": self.status_presenca.value if self.status_presenca else None,
             "turno": self.turno.value if self.turno else None,
             "extras": self.extras or {},
+            "pet_nome_avulso": self.pet_nome_avulso,
+            "cliente_nome_avulso": self.cliente_nome_avulso,
+            "valor_avulso": self.valor_avulso,
             "registrado_em": self.registrado_em.isoformat() if self.registrado_em else None,
             "atualizado_em": self.atualizado_em.isoformat() if self.atualizado_em else None
         }

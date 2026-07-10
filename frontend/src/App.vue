@@ -11,6 +11,7 @@
       <ul class="nav-links">
         <li><router-link to="/">🏠 Dashboard</router-link></li>
         <li><router-link to="/pacotes">📦 Pacotes</router-link></li>
+        <li><router-link to="/banhos-avulsos">🛁 Banhos Avulsos</router-link></li>
         <li><router-link to="/clientes">👥 Clientes</router-link></li>
         <li><router-link to="/relatorios">📊 Relatórios</router-link></li>
       </ul>

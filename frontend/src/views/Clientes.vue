@@ -22,7 +22,7 @@
       <div v-for="cliente in clientesFiltrados" :key="cliente.id" class="cliente-card">
         <div class="cliente-header">
           <div>
-            <h3 class="cliente-nome">{{ cliente.nome }}</h3>
+            <h3 class="cliente-nome cliente-nome-link" @click="verDetalhesCliente(cliente)" title="Ver pacotes deste cliente">{{ cliente.nome }}</h3>
             <div class="cliente-info">
               <span v-if="cliente.telefone">📞 {{ cliente.telefone }}</span>
               <span v-if="cliente.endereco">📍 {{ cliente.endereco }}</span>
@@ -165,6 +165,9 @@ function editarCachorro(cliente, dog) {
 function verPacotesCachorro(dog) {
   router.push(`/pacotes?cachorro_id=${dog.id}`)
 }
+function verDetalhesCliente(cliente) {
+  router.push(`/clientes/${cliente.id}`)
+}
 async function salvarCliente() {
   try {
     if (editando.value) {
@@ -271,6 +274,8 @@ onMounted(() => { clientesStore.fetchClientes() })
   margin-bottom: 0.6rem;
 }
 .cliente-nome { font-size: 1.1rem; font-weight: 800; color: var(--marrom); margin: 0 0 4px; }
+.cliente-nome-link { cursor: pointer; transition: color 0.15s; width: fit-content; }
+.cliente-nome-link:hover { color: var(--dourado); text-decoration: underline; }
 .cliente-info { display: flex; gap: 1rem; color: var(--text-muted); font-size: 0.88rem; font-weight: 600; }
 .cliente-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
 
