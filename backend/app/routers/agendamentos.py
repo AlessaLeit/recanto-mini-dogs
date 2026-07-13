@@ -52,6 +52,7 @@ def criar_banho_avulso(dados: AgendamentoAvulsoCreate, db: Session = Depends(get
         pet_nome_avulso=dados.pet_nome_avulso.strip(),
         cliente_nome_avulso=dados.cliente_nome_avulso.strip(),
         valor_avulso=dados.valor_avulso,
+        pago_avulso=dados.pago_avulso,
         extras={"info": dados.observacao or "", "valor_extra": 0}
     )
     db.add(db_ag)

@@ -51,6 +51,7 @@ class AgendamentoAvulsoCreate(BaseModel):
     turno: Literal["manha", "tarde"] = Field(default="manha", description="Turno do banho")
     valor_avulso: float = Field(..., ge=0, description="Valor cobrado pelo banho avulso")
     observacao: Optional[str] = Field(default=None, description="Ex: Tosa higiênica (deixe em branco se for só banho)")
+    pago_avulso: bool = Field(default=False, description="Se o banho avulso já foi pago")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -71,6 +72,7 @@ class AgendamentoUpdate(BaseModel):
     status_presenca: Optional[Literal["pendente", "concluido", "faltou"]] = None
     turno: Optional[Literal["manha", "tarde"]] = None
     extras: Optional[Dict[str, Any]] = None
+    pago_avulso: Optional[bool] = None
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -88,6 +90,7 @@ class AgendamentoResponse(AgendamentoBase):
     pet_nome_avulso: Optional[str] = None
     cliente_nome_avulso: Optional[str] = None
     valor_avulso: Optional[float] = None
+    pago_avulso: bool = False
     registrado_em: datetime
     atualizado_em: Optional[datetime] = None
 

@@ -103,10 +103,22 @@
                   type="checkbox"
                   :value="cachorro.id"
                   v-model="novoPacote.cachorros_adicionais_ids"
+                  @change="calcularSugeridoNovo"
                 />
                 {{ cachorro.nome }}
               </label>
             </div>
+          </div>
+          <div class="form-group" v-for="cachorro in cachorrosAdicionaisSelecionados" :key="'valor-' + cachorro.id">
+            <label :for="'novo-valor-extra-' + cachorro.id">Valor do banho — {{ cachorro.nome }} (opcional)</label>
+            <input
+              :id="'novo-valor-extra-' + cachorro.id"
+              v-model.number="valoresAdicionais[cachorro.id]"
+              type="number"
+              step="0.01"
+              placeholder="Se vazio, dobra o valor base"
+              @input="calcularSugeridoNovo"
+            />
           </div>
           <div class="form-group">
             <label for="novo-tipo-plano">Tipo de Plano</label>
@@ -156,7 +168,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePacotesStore } from '../stores/pacotes'
 import { useClientesStore } from '../stores/clientes'
@@ -187,6 +199,10 @@ const novoPacote = ref({
   valor_cobrado: 0
 })
 
+// Valor do banho por cachorro adicional (opcional). Se não informado para um
+// cachorro adicional, assume-se o mesmo valor do cachorro principal (dobra o valor).
+const valoresAdicionais = reactive({})
+
 const cachorroId = computed(() => {
   const id = Number.parseInt(route.query.cachorro_id, 10)
   if (id && !novoPacote.value.cachorro_id) novoPacote.value.cachorro_id = id
@@ -209,6 +225,10 @@ const outrosCachorrosDoCliente = computed(() => {
   if (!principal || !principal.cliente) return []
   return cachorros.value.filter(d => d.cliente?.id === principal.cliente.id && d.id !== principal.id)
 })
+
+const cachorrosAdicionaisSelecionados = computed(() =>
+  outrosCachorrosDoCliente.value.filter(c => novoPacote.value.cachorros_adicionais_ids.includes(c.id))
+)
 const pacotesFiltrados = computed(() => {
   let lista = pacotesStore.pacotes
   if (filtroStatus.value === 'ativos') lista = lista.filter(p => p.ativo)
@@ -227,16 +247,22 @@ const cachorrosFiltradosNovo = computed(() => {
   )
 })
 
+function limparValoresAdicionais() {
+  Object.keys(valoresAdicionais).forEach(key => delete valoresAdicionais[key])
+}
+
 function abrirNovoPacote() {
   buscaCachorroNovo.value = ''
   mostrarListaCachorro.value = false
   novoPacote.value.cachorros_adicionais_ids = []
+  limparValoresAdicionais()
   showNovoPacote.value = true
 }
 
 function selecionarCachorroNovo(cachorro) {
   novoPacote.value.cachorro_id = cachorro.id
   novoPacote.value.cachorros_adicionais_ids = []
+  limparValoresAdicionais()
   buscaCachorroNovo.value = `${cachorro.nome} (${cachorro.cliente?.nome || ''})`
   mostrarListaCachorro.value = false
 }
@@ -245,6 +271,7 @@ function onDigitarCachorroNovo() {
   // Se o texto foi alterado, invalida a seleção até escolher um item da lista de novo.
   novoPacote.value.cachorro_id = null
   novoPacote.value.cachorros_adicionais_ids = []
+  limparValoresAdicionais()
   mostrarListaCachorro.value = true
 }
 
@@ -257,8 +284,15 @@ function calcularSugeridoNovo() {
   const qtd = novoPacote.value.tipo_plano === 'semanal' ? 4 : (novoPacote.value.tipo_plano === 'quinzenal' ? 2 : 1)
   const base = novoPacote.value.valor_banho_base || 0
   const transporte = novoPacote.value.valor_transporte || 0
-  
-  novoPacote.value.valor_cobrado = (base * qtd) + transporte
+
+  // Cada cachorro adicional soma seu próprio valor por banho; se não informado,
+  // assume o mesmo valor do cachorro principal (dobra o valor do banho).
+  const valorPorBanho = novoPacote.value.cachorros_adicionais_ids.reduce((total, id) => {
+    const valorExtra = valoresAdicionais[id]
+    return total + (valorExtra || base)
+  }, base)
+
+  novoPacote.value.valor_cobrado = (valorPorBanho * qtd) + transporte
 }
 
 function voltarTodosPacotes() { router.push('/pacotes') }
@@ -290,6 +324,7 @@ async function criarPacote() {
     showNovoPacote.value = false
     // Resetar formulário
     novoPacote.value = { cachorro_id: null, cachorros_adicionais_ids: [], tipo_plano: 'semanal', dia_da_semana: 'terca', valor_banho_base: 0, valor_transporte: 0, valor_cobrado: 0 }
+    limparValoresAdicionais()
     buscaCachorroNovo.value = ''
   } catch (err) { alert('Erro ao criar pacote: ' + err) }
 }

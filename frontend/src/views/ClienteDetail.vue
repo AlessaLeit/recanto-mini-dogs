@@ -43,7 +43,7 @@
               :class="ag.status_presenca"
             >
               <span class="data-data">{{ formatarData(ag.data_banho) }}</span>
-              <span class="data-valor">R$ {{ formatarValor(bloco.pacote.valor_banho_base) }}</span>
+              <span class="data-valor">R$ {{ formatarValor(bloco.valorBanhoEquivalente) }}</span>
               <span v-if="ag.extras?.info" class="data-extra">{{ ag.extras.info }}</span>
               <span v-if="ag.extras?.valor_extra > 0" class="data-extra-valor">R$ {{ formatarValor(ag.extras.valor_extra) }}</span>
             </div>
@@ -169,9 +169,14 @@ const blocos = computed(() => {
     const primeiraData = agendamentosOrdenados[0]?.data_banho
     const dataRef = primeiraData ? new Date(primeiraData + 'T00:00:00') : new Date(pacote.criado_em)
 
+    // Pacotes com mais de um cachorro banham juntos no mesmo dia, então o valor
+    // do dia equivale ao valor base multiplicado pela quantidade de cachorros.
+    const qtdCachorros = pacote.cachorros?.length || 1
+    const valorBanhoEquivalente = (pacote.valor_banho_base || 0) * qtdCachorros
+
     const totalConcluidos = agendamentosOrdenados.reduce((sum, ag) => {
       if (ag.status_presenca !== 'concluido') return sum
-      return sum + (pacote.valor_banho_base || 0) + (ag.extras?.valor_extra || 0)
+      return sum + valorBanhoEquivalente + (ag.extras?.valor_extra || 0)
     }, 0)
     const total = totalConcluidos + (pacote.valor_transporte || 0)
 
@@ -185,6 +190,7 @@ const blocos = computed(() => {
       agendamentos: agendamentosOrdenados,
       mesLabel: mesesNomes[dataRef.getMonth()],
       anoLabel: dataRef.getFullYear(),
+      valorBanhoEquivalente,
       total
     }
   })

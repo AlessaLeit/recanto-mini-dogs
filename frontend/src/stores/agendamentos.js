@@ -31,6 +31,20 @@ export const useAgendamentosStore = defineStore('agendamentos', {
       }
     },
 
+    async atualizarAvulso(agendamentoId, dados) {
+      try {
+        const response = await agendamentosApi.atualizarStatus(agendamentoId, dados)
+        const index = this.avulsos.findIndex(a => a.id === agendamentoId)
+        if (index !== -1) {
+          this.avulsos[index] = { ...this.avulsos[index], ...response.data }
+        }
+        return response.data
+      } catch (error) {
+        console.error('Erro ao atualizar banho avulso:', error)
+        throw error
+      }
+    },
+
     async deletarAvulso(agendamentoId) {
       try {
         await agendamentosApi.deletarAgendamento(agendamentoId)

@@ -30,6 +30,9 @@
       <div class="info-card clickable" @click="abrirEditarPacote" title="Clique para editar valores">
         <span class="info-label">Valor Base do Banho</span>
         <span class="info-value">R$ {{ formatarValor(pacote?.valor_banho_base || 0) }}</span>
+        <span class="info-sub" v-if="qtdCachorros > 1">
+          {{ qtdCachorros }} cachorros = R$ {{ formatarValor(valorBanhoEquivalente) }}/dia
+        </span>
       </div>
 
       <div class="info-card clickable" @click="abrirEditarPacote" title="Clique para editar valores">
@@ -92,7 +95,7 @@
               </span>
             </td>
             <td class="clickable-cell" @click="abrirEditarExtras(ag)">{{ ag.extras?.info || '-' }}</td>
-            <td>R$ {{ formatarValor(pacote?.valor_banho_base || 0) }}</td>
+            <td>R$ {{ formatarValor(valorBanhoEquivalente) }}</td>
             <td class="clickable-cell" @click="abrirEditarExtras(ag)">R$ {{ formatarValor(ag.extras?.valor_extra || 0) }}</td>
             <td>
               <div class="acoes">
@@ -418,15 +421,25 @@ const valorRestante = computed(() => {
   return (pacote.value.valor_cobrado || 0) - (pacote.value.valor_pago || 0);
 });
 
+// Quantidade de cachorros do pacote (principal + adicionais). Pacotes com mais
+// de um cachorro banham juntos no mesmo dia, então o valor do dia equivale ao
+// valor base multiplicado pela quantidade de cachorros.
+const qtdCachorros = computed(() => pacote.value?.cachorros?.length || 1)
+
+const valorBanhoEquivalente = computed(() => {
+  const valorBase = pacote.value?.valor_banho_base || 0
+  return valorBase * qtdCachorros.value
+})
+
 const totalPacote = computed(() => {
   if (!pacote.value) return 0
-  const valorBase = pacote.value.valor_banho_base || 0
+  const valorBanho = valorBanhoEquivalente.value
   const transporte = pacote.value.valor_transporte || 0
   const agendamentosTotal = agendamentos.value.reduce((sum, ag) => {
     const concluido = ag.status_presenca === 'concluido'
 
     // Regra: só soma banho base e extras quando o agendamento estiver CONCLUÍDO.
-    const valorBanhoSomado = concluido ? valorBase : 0
+    const valorBanhoSomado = concluido ? valorBanho : 0
     const valorExtraSomado = concluido ? (ag.extras?.valor_extra || 0) : 0
 
     return sum + valorBanhoSomado + valorExtraSomado
@@ -559,7 +572,7 @@ function abrirEditarPacote() {
   
   // Define o valor sugerido apenas como referência inicial sem alterar o valor_cobrado salvo
   const qtd = formPacote.value.tipo_plano === 'semanal' ? 4 : (formPacote.value.tipo_plano === 'quinzenal' ? 2 : 1)
-  valorSugerido.value = (formPacote.value.valor_banho_base * qtd) + formPacote.value.valor_transporte
+  valorSugerido.value = (formPacote.value.valor_banho_base * qtdCachorros.value * qtd) + formPacote.value.valor_transporte
   sugestaoVisivel.value = true
   showModalEditPacote.value = true
 }
@@ -572,10 +585,10 @@ function recalcularSugerido() {
   const qtd = formPacote.value.tipo_plano === 'semanal' ? 4 : (formPacote.value.tipo_plano === 'quinzenal' ? 2 : 1)
   const valorBase = formPacote.value.valor_banho_base || 0
   const transporte = formPacote.value.valor_transporte || 0
-  
-  // Recalcula o sugerido: (Quantidade de banhos do plano * valor base) + Transporte total
-  valorSugerido.value = (valorBase * qtd) + transporte
-  
+
+  // Recalcula o sugerido: (Quantidade de banhos do plano * valor base * qtd. cachorros) + Transporte total
+  valorSugerido.value = (valorBase * qtdCachorros.value * qtd) + transporte
+
   // Atualiza o valor final que será gravado no pacote
   formPacote.value.valor_cobrado = valorSugerido.value
   sugestaoVisivel.value = true

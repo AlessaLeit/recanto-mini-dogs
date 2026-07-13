@@ -55,6 +55,7 @@
             <th>Valor</th>
             <th>Observação</th>
             <th>Status</th>
+            <th>Pagamento</th>
             <th>Ações</th>
           </tr>
         </thead>
@@ -74,6 +75,16 @@
                 <option value="concluido">🟢 Concluído</option>
                 <option value="faltou">🔴 Faltou</option>
               </select>
+            </td>
+            <td>
+              <label class="pagamento-check">
+                <input
+                  type="checkbox"
+                  :checked="ag.pago_avulso"
+                  @change="mudarPagamento(ag, $event.target.checked)"
+                />
+                {{ ag.pago_avulso ? 'Pago' : 'Pendente' }}
+              </label>
             </td>
             <td>
               <button @click="confirmarRemover(ag)" class="btn-acao btn-acao-perigo" title="Excluir">✕</button>
@@ -158,10 +169,19 @@ async function registrar() {
 
 async function mudarStatus(ag, novoStatus) {
   try {
-    await agendamentosStore.updateStatus(ag.id, { status_presenca: novoStatus })
+    await agendamentosStore.atualizarAvulso(ag.id, { status_presenca: novoStatus })
     ag.status_presenca = novoStatus
   } catch (err) {
     alert('Erro ao atualizar status: ' + err.message)
+  }
+}
+
+async function mudarPagamento(ag, pago) {
+  try {
+    await agendamentosStore.atualizarAvulso(ag.id, { pago_avulso: pago })
+    ag.pago_avulso = pago
+  } catch (err) {
+    alert('Erro ao atualizar pagamento: ' + err.message)
   }
 }
 
@@ -261,6 +281,13 @@ onMounted(carregar)
 .status-select.pendente  { color: #6b4c00; border-color: var(--dourado-claro); }
 .status-select.concluido { color: var(--verde); border-color: var(--verde); }
 .status-select.faltou    { color: #b94040; border-color: #f5c0c0; }
+
+.pagamento-check {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-size: 0.85rem; font-weight: 700; color: var(--text-muted); cursor: pointer;
+}
+.pagamento-check input[type="checkbox"] { width: auto; margin: 0; cursor: pointer; }
+.pagamento-check:has(input:checked) { color: var(--verde); }
 
 .btn-acao {
   border: none; padding: 0.38rem 0.7rem; border-radius: 6px; cursor: pointer;

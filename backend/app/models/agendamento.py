@@ -2,7 +2,7 @@
 Model Agendamento - Representa um agendamento de banho/tosa de um pacote.
 Permite edição retroativa de status e extras.
 """
-from sqlalchemy import Text, Float, String, ForeignKey, DateTime, Date, func, JSON
+from sqlalchemy import Text, Float, String, ForeignKey, DateTime, Date, func, JSON, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import Enum as SQLEnum
 from app.database import Base
@@ -37,7 +37,11 @@ class Agendamento(Base):
     pet_nome_avulso: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     cliente_nome_avulso: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     valor_avulso: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    
+
+    # Pagamento do banho avulso (não se aplica a agendamentos de pacote, que usam
+    # a tabela Pagamento separada).
+    pago_avulso: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+
     # Data planejada do agendamento
     data_banho: Mapped[date] = mapped_column(Date, nullable=False)
     
@@ -89,6 +93,7 @@ class Agendamento(Base):
             "pet_nome_avulso": self.pet_nome_avulso,
             "cliente_nome_avulso": self.cliente_nome_avulso,
             "valor_avulso": self.valor_avulso,
+            "pago_avulso": self.pago_avulso,
             "registrado_em": self.registrado_em.isoformat() if self.registrado_em else None,
             "atualizado_em": self.atualizado_em.isoformat() if self.atualizado_em else None
         }

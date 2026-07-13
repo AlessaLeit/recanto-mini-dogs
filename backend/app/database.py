@@ -85,6 +85,7 @@ def ensure_schema_upgrades() -> None:
             ("pet_nome_avulso", "VARCHAR(100)"),
             ("cliente_nome_avulso", "VARCHAR(100)"),
             ("valor_avulso", "FLOAT"),
+            ("pago_avulso", "BOOLEAN DEFAULT FALSE"),
         ],
         "cachorros": [("criado_em", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")],
         "pagamentos": [("observacao", "TEXT")],
