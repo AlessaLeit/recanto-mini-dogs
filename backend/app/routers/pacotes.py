@@ -8,7 +8,11 @@ from typing import List, Any, Optional
 from app.database import get_db
 from app import models, schemas
 from app.services.pacote_service import PacoteService
+from app.services import whatsapp_service
 from app.auth import get_current_user
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     tags=["Pacotes"],
@@ -61,6 +65,7 @@ def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Session = Depends(get_d
     dados_pacote.pop('limite_banhos_mes', None)
     dados_pacote.pop('status_pagamento', None)
     cachorros_adicionais_ids = dados_pacote.pop('cachorros_adicionais_ids', [])
+    valores_adicionais = dados_pacote.pop('valores_adicionais', {})
 
     # Garante que o dia da semana não seja nulo (correção IntegrityError)
     if not dados_pacote.get('dia_da_semana'):
@@ -93,6 +98,15 @@ def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Session = Depends(get_d
     db_pacote = models.Pacote(**dados_pacote)
     if cachorros_extras:
         db_pacote.cachorros_adicionais = cachorros_extras
+        # Só persiste valores explicitamente informados; cachorros sem entrada
+        # aqui usam valor_banho_base como padrão (calculado em valor_banho_equivalente).
+        valores_persistir = {
+            str(c.id): valores_adicionais[c.id]
+            for c in cachorros_extras
+            if c.id in valores_adicionais
+        }
+        if valores_persistir:
+            db_pacote.valores_cachorros = valores_persistir
     db.add(db_pacote)
     db.commit()
     db.refresh(db_pacote)
@@ -208,6 +222,9 @@ def atualizar_pacote(pacote_id: int, pacote_atualizar: schemas.PacoteUpdate, db:
     
     update_data = pacote_atualizar.model_dump(exclude_unset=True)
     cachorros_adicionais_ids = update_data.pop('cachorros_adicionais_ids', None)
+    if 'valores_cachorros' in update_data:
+        valores = update_data['valores_cachorros'] or {}
+        update_data['valores_cachorros'] = {str(k): v for k, v in valores.items()}
     for field, value in update_data.items():
         setattr(pacote, field, value)
 
@@ -231,6 +248,22 @@ def atualizar_pacote(pacote_id: int, pacote_atualizar: schemas.PacoteUpdate, db:
 
     return schemas.PacoteResponse.model_validate(pacote).model_dump()
 
+def _tentar_enviar_comanda(pacote: models.Pacote) -> None:
+    """
+    Envia a comanda por WhatsApp se o cliente tiver essa preferência configurada.
+    Best-effort: qualquer falha (WhatsApp desconectado, número inválido, etc.)
+    é apenas logada, nunca interrompe o fluxo de fechamento do pacote.
+    """
+    cliente = pacote.cachorro.cliente if pacote.cachorro else None
+    if not cliente or cliente.envio_comanda != "whatsapp" or not cliente.whatsapp:
+        return
+    try:
+        mensagem = whatsapp_service.formatar_comanda_mensagem(pacote)
+        whatsapp_service.enviar_texto(cliente.whatsapp, mensagem)
+    except Exception as e:
+        logger.warning(f"Falha ao enviar comanda por WhatsApp (pacote {pacote.id}): {e}")
+
+
 @router.patch("/{pacote_id}/fechar", response_model=schemas.PacoteResponse)
 def fechar_pacote(pacote_id: int, db: Session = Depends(get_db)):
     """Marca o pacote como fechado (ciclo concluído, aguardando acerto)."""
@@ -241,11 +274,38 @@ def fechar_pacote(pacote_id: int, db: Session = Depends(get_db)):
 
     if not pacote:
         raise HTTPException(status_code=404, detail="Pacote não encontrado")
-    
+
     pacote.fechado = True
     db.commit()
     db.refresh(pacote)
+    _tentar_enviar_comanda(pacote)
     return schemas.PacoteResponse.model_validate(pacote).model_dump()
+
+
+@router.post("/{pacote_id}/enviar-comanda")
+def enviar_comanda_manual(pacote_id: int, db: Session = Depends(get_db)):
+    """Reenvia a comanda por WhatsApp manualmente (independente do status de fechamento)."""
+    pacote = db.query(models.Pacote).options(
+        joinedload(models.Pacote.cachorro).joinedload(models.Cachorro.cliente),
+        joinedload(models.Pacote.agendamentos)
+    ).filter(models.Pacote.id == pacote_id).first()
+
+    if not pacote:
+        raise HTTPException(status_code=404, detail="Pacote não encontrado")
+
+    cliente = pacote.cachorro.cliente if pacote.cachorro else None
+    if not cliente or not cliente.whatsapp:
+        raise HTTPException(status_code=400, detail="Cliente não tem WhatsApp cadastrado.")
+
+    try:
+        mensagem = whatsapp_service.formatar_comanda_mensagem(pacote)
+        whatsapp_service.enviar_texto(cliente.whatsapp, mensagem)
+    except whatsapp_service.WhatsAppNaoConfigurado:
+        raise HTTPException(status_code=503, detail="Integração com WhatsApp não configurada.")
+    except whatsapp_service.WhatsAppError as e:
+        raise HTTPException(status_code=502, detail=f"Falha ao enviar comanda: {e}")
+
+    return {"enviado": True}
 
 @router.delete("/{pacote_id}", status_code=status.HTTP_204_NO_CONTENT)
 def deletar_pacote(

@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from sqlalchemy.pool import StaticPool
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Generator
+from typing import Generator, Optional
 import os
 
 
@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 720
     ADMIN_EMAIL: str
     ADMIN_PASSWORD: str
+
+    # Evolution API (WhatsApp) - opcional; se ausente, envio de comanda por
+    # WhatsApp fica desabilitado sem quebrar o restante da aplicação.
+    EVOLUTION_API_URL: Optional[str] = None
+    EVOLUTION_API_KEY: Optional[str] = None
+    EVOLUTION_INSTANCE_NAME: str = "recanto-minidogs"
 
 
 # Instância global das configurações
@@ -89,6 +95,11 @@ def ensure_schema_upgrades() -> None:
         ],
         "cachorros": [("criado_em", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")],
         "pagamentos": [("observacao", "TEXT")],
+        "pacotes": [("valores_cachorros", "JSON")],
+        "clientes": [
+            ("whatsapp", "VARCHAR(20)"),
+            ("envio_comanda", "VARCHAR(20) DEFAULT 'impresso'"),
+        ],
     }
 
     for tabela, colunas in colunas_novas.items():
@@ -122,3 +133,17 @@ def ensure_schema_upgrades() -> None:
             conn.execute(text("ALTER TABLE cachorros ALTER COLUMN criado_em SET DEFAULT CURRENT_TIMESTAMP"))
             conn.execute(text("UPDATE cachorros SET criado_em = CURRENT_TIMESTAMP WHERE criado_em IS NULL"))
             conn.execute(text("ALTER TABLE cachorros ALTER COLUMN criado_em SET NOT NULL"))
+
+    # O campo 'telefone' foi removido do app (substituído por 'whatsapp' como
+    # único contato). Antes de parar de usá-lo, faz o backfill: qualquer
+    # cliente com telefone preenchido mas sem whatsapp herda o número. A
+    # coluna 'telefone' continua existindo no banco (não é apagada), só não
+    # é mais lida/gravada pela aplicação.
+    if "clientes" in inspector.get_table_names():
+        colunas_clientes = {c["name"] for c in inspector.get_columns("clientes")}
+        if "telefone" in colunas_clientes and "whatsapp" in colunas_clientes:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "UPDATE clientes SET whatsapp = telefone "
+                    "WHERE whatsapp IS NULL AND telefone IS NOT NULL"
+                ))

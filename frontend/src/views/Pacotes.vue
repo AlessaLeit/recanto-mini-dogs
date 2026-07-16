@@ -320,7 +320,10 @@ async function criarPacote() {
   }
 
   try {
-    await pacotesStore.criarPacote(novoPacote.value)
+    const valoresAdicionaisValidos = Object.fromEntries(
+      Object.entries(valoresAdicionais).filter(([, v]) => typeof v === 'number' && !Number.isNaN(v))
+    )
+    await pacotesStore.criarPacote({ ...novoPacote.value, valores_adicionais: valoresAdicionaisValidos })
     showNovoPacote.value = false
     // Resetar formulário
     novoPacote.value = { cachorro_id: null, cachorros_adicionais_ids: [], tipo_plano: 'semanal', dia_da_semana: 'terca', valor_banho_base: 0, valor_transporte: 0, valor_cobrado: 0 }

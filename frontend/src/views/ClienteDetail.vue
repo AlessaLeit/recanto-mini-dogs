@@ -4,8 +4,8 @@
       <button @click="voltar" class="btn-back">← Voltar</button>
       <div class="header-info">
         <h1>{{ cliente?.nome || 'Cliente' }}</h1>
-        <p class="subheader" v-if="cliente?.telefone || cliente?.endereco">
-          <span v-if="cliente.telefone">📞 {{ cliente.telefone }}</span>
+        <p class="subheader" v-if="cliente?.whatsapp || cliente?.endereco">
+          <span v-if="cliente.whatsapp">💬 {{ cliente.whatsapp }}</span>
           <span v-if="cliente.endereco">📍 {{ cliente.endereco }}</span>
         </p>
       </div>

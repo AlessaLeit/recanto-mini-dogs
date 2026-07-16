@@ -122,7 +122,7 @@ class RelatorioService:
                 "cliente": {
                     "id": p.cachorro.cliente.id,
                     "nome": p.cachorro.cliente.nome,
-                    "telefone": p.cachorro.cliente.telefone
+                    "whatsapp": p.cachorro.cliente.whatsapp
                 }
             })
 

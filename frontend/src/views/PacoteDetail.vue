@@ -154,7 +154,16 @@
       <div class="footer-danger-zone">
         <button @click="confirmarDeletarPacote" class="btn btn-perigo" title="Excluir este pacote">🗑️ Excluir Pacote</button>
         <div class="footer-actions">
-          <button v-if="pacote?.status_pagamento === 'em_aberto' || pacote?.status_pagamento === 'parcial' || pacote?.status_pagamento === 'atrasado'" @click="abrirPagamento(true)" class="btn btn-ghost" style="border-color: var(--dourado); color: var(--marrom);">🔒 Fechar e Pagar</button>
+          <button
+            v-if="pacote?.cliente_envio_comanda === 'whatsapp'"
+            @click="enviarComandaWhatsapp"
+            class="btn btn-ghost"
+            style="border-color: var(--verde); color: var(--verde);"
+            :disabled="enviandoComanda"
+          >
+            {{ enviandoComanda ? 'Enviando...' : '💬 Enviar Comanda' }}
+          </button>
+          <button v-if="pacote?.status_pagamento === 'em_aberto' || pacote?.status_pagamento === 'parcial' || pacote?.status_pagamento === 'atrasado'" @click="abrirPagamento(true)" class="btn btn-ghost" style="border-color: var(--dourado); color: var(--marrom); margin-left: 0.5rem;">🔒 Fechar e Pagar</button>
           <button v-if="pacote?.status_pagamento !== 'pago'" @click="abrirPagamento(false)" class="btn btn-primario" style="margin-left: 0.5rem;">💰 Registrar Pagamento</button>
         </div>
       </div>
@@ -225,7 +234,7 @@
           </div>
         </div>
 
-        <div class="grid-form">
+        <div class="grid-form" v-if="cachorrosAdicionaisPacote.length === 0">
           <div class="form-group">
             <label for="valor-base">Valor Base Banho (R$)</label>
             <input id="valor-base" type="number" step="0.01" v-model.number="formPacote.valor_banho_base" @input="handleInputMudanca" />
@@ -235,6 +244,31 @@
             <input id="transporte" type="number" step="0.01" v-model.number="formPacote.valor_transporte" @input="handleInputMudanca" />
           </div>
         </div>
+
+        <template v-else>
+          <div class="grid-form">
+            <div class="form-group">
+              <label for="valor-base">Valor do Banho — {{ cachorroPrincipalPacote?.nome }} (R$)</label>
+              <input id="valor-base" type="number" step="0.01" v-model.number="formPacote.valor_banho_base" @input="handleInputMudanca" />
+            </div>
+            <div class="form-group" v-for="cachorro in cachorrosAdicionaisPacote" :key="cachorro.id">
+              <label :for="'valor-extra-' + cachorro.id">Valor do Banho — {{ cachorro.nome }} (R$)</label>
+              <input
+                :id="'valor-extra-' + cachorro.id"
+                type="number"
+                step="0.01"
+                v-model.number="formValoresCachorros[cachorro.id]"
+                @input="handleInputMudanca"
+              />
+            </div>
+          </div>
+          <div class="grid-form">
+            <div class="form-group">
+              <label for="transporte">Transporte Total (R$)</label>
+              <input id="transporte" type="number" step="0.01" v-model.number="formPacote.valor_transporte" @input="handleInputMudanca" />
+            </div>
+          </div>
+        </template>
 
         <div class="form-group form-highlight">
           <label for="valor-cobrado">Valor Total Cobrado (R$)</label>
@@ -378,7 +412,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePacotesStore } from '../stores/pacotes.js'
 
@@ -389,6 +423,7 @@ const pacotesStore = usePacotesStore()
 const pacote = ref(null)
 const agendamentos = ref([])
 const loading = ref(false)
+const enviandoComanda = ref(false)
 
 // Modais
 const showEditData = ref(false)
@@ -410,6 +445,8 @@ const pagamentoRemovendo = ref(null)
 const agExtras = ref(null)
 const formExtras = ref({ info: '', valor_extra: 0, status_presenca: 'pendente' })
 const formPacote = ref({ tipo_plano: '', dia_da_semana: '', valor_banho_base: 0, valor_cobrado: 0, valor_transporte: 0 });
+// Valor do banho por cachorro adicional (pacotes multi-cachorro), keyed por id do cachorro.
+const formValoresCachorros = reactive({})
 const formPagamento = ref({ valor_pago: 0, data_pagamento: '', tipo_pagamento: 'pix', fechar_pacote: false, observacao: '' });
 const valorSugerido = ref(0)
 const sugestaoVisivel = ref(false)
@@ -422,14 +459,19 @@ const valorRestante = computed(() => {
 });
 
 // Quantidade de cachorros do pacote (principal + adicionais). Pacotes com mais
-// de um cachorro banham juntos no mesmo dia, então o valor do dia equivale ao
-// valor base multiplicado pela quantidade de cachorros.
+// de um cachorro banham juntos no mesmo dia, então o valor do dia soma o valor
+// de cada cachorro (calculado no backend em valor_banho_equivalente).
 const qtdCachorros = computed(() => pacote.value?.cachorros?.length || 1)
 
-const valorBanhoEquivalente = computed(() => {
-  const valorBase = pacote.value?.valor_banho_base || 0
-  return valorBase * qtdCachorros.value
-})
+const valorBanhoEquivalente = computed(() => pacote.value?.valor_banho_equivalente ?? (pacote.value?.valor_banho_base || 0))
+
+const cachorroPrincipalPacote = computed(() =>
+  pacote.value?.cachorros?.find(c => c.id === pacote.value.cachorro_id)
+)
+
+const cachorrosAdicionaisPacote = computed(() =>
+  (pacote.value?.cachorros || []).filter(c => c.id !== pacote.value?.cachorro_id)
+)
 
 const totalPacote = computed(() => {
   if (!pacote.value) return 0
@@ -569,10 +611,17 @@ function abrirEditarPacote() {
     valor_cobrado: pacote.value.valor_cobrado,
     valor_transporte: pacote.value.valor_transporte || 0
   }
-  
+
+  // Preenche um input de valor por cachorro adicional, usando o valor já
+  // customizado (valores_cachorros) ou o valor base como padrão editável.
+  Object.keys(formValoresCachorros).forEach(key => delete formValoresCachorros[key])
+  cachorrosAdicionaisPacote.value.forEach(c => {
+    const valorCustom = pacote.value.valores_cachorros?.[c.id]
+    formValoresCachorros[c.id] = valorCustom ?? pacote.value.valor_banho_base
+  })
+
   // Define o valor sugerido apenas como referência inicial sem alterar o valor_cobrado salvo
-  const qtd = formPacote.value.tipo_plano === 'semanal' ? 4 : (formPacote.value.tipo_plano === 'quinzenal' ? 2 : 1)
-  valorSugerido.value = (formPacote.value.valor_banho_base * qtdCachorros.value * qtd) + formPacote.value.valor_transporte
+  calcularValorSugerido()
   sugestaoVisivel.value = true
   showModalEditPacote.value = true
 }
@@ -581,22 +630,39 @@ function handleInputMudanca() {
   recalcularSugerido()
 }
 
-function recalcularSugerido() {
+// Calcula apenas o valor sugerido (texto de referência), sem alterar formPacote.valor_cobrado.
+function calcularValorSugerido() {
   const qtd = formPacote.value.tipo_plano === 'semanal' ? 4 : (formPacote.value.tipo_plano === 'quinzenal' ? 2 : 1)
   const valorBase = formPacote.value.valor_banho_base || 0
   const transporte = formPacote.value.valor_transporte || 0
 
-  // Recalcula o sugerido: (Quantidade de banhos do plano * valor base * qtd. cachorros) + Transporte total
-  valorSugerido.value = (valorBase * qtdCachorros.value * qtd) + transporte
+  // Cada cachorro adicional soma seu próprio valor por banho; se vazio/inválido,
+  // assume o valor base do cachorro principal.
+  const valorPorBanho = cachorrosAdicionaisPacote.value.reduce((total, c) => {
+    const valorExtra = formValoresCachorros[c.id]
+    return total + (typeof valorExtra === 'number' && !Number.isNaN(valorExtra) ? valorExtra : valorBase)
+  }, valorBase)
 
-  // Atualiza o valor final que será gravado no pacote
+  valorSugerido.value = (valorPorBanho * qtd) + transporte
+}
+
+// Recalcula o sugerido E atualiza o valor final que será gravado (chamado quando o usuário edita).
+function recalcularSugerido() {
+  calcularValorSugerido()
   formPacote.value.valor_cobrado = valorSugerido.value
   sugestaoVisivel.value = true
 }
 
 async function salvarDadosPacote() {
   try {
-    await pacotesStore.atualizarPacote(pacoteId.value, { ...formPacote.value })
+    const valoresCachorros = Object.fromEntries(
+      Object.entries(formValoresCachorros).filter(([, v]) => typeof v === 'number' && !Number.isNaN(v))
+    )
+    const payload = { ...formPacote.value }
+    if (cachorrosAdicionaisPacote.value.length > 0) {
+      payload.valores_cachorros = valoresCachorros
+    }
+    await pacotesStore.atualizarPacote(pacoteId.value, payload)
     showModalEditPacote.value = false
     await carregarPacote()
   } catch (err) {
@@ -640,6 +706,22 @@ function confirmarRemover(ag) {
 
 function confirmarDeletarPacote() {
   showConfirmDeletePacote.value = true
+}
+
+async function enviarComandaWhatsapp() {
+  if (!pacote.value?.cliente_whatsapp) {
+    alert('Este cliente não tem WhatsApp cadastrado. Adicione o número na tela de Clientes.')
+    return
+  }
+  enviandoComanda.value = true
+  try {
+    await pacotesStore.enviarComanda(pacoteId.value)
+    alert('Comanda enviada por WhatsApp com sucesso!')
+  } catch (err) {
+    alert('Erro ao enviar comanda: ' + (err.response?.data?.detail || err.message))
+  } finally {
+    enviandoComanda.value = false
+  }
 }
 
 async function executarDeletarPacote() {

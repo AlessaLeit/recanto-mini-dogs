@@ -11,6 +11,7 @@ import Login from '../views/Login.vue'
 import PacoteDetail from '../views/PacoteDetail.vue'
 import BanhosAvulsos from '../views/BanhosAvulsos.vue'
 import ClienteDetail from '../views/ClienteDetail.vue'
+import WhatsAppConfig from '../views/WhatsAppConfig.vue'
 import { useAuthStore } from '../stores/auth'
 
 const routes = [
@@ -54,6 +55,11 @@ const routes = [
     path: '/clientes/:id',
     name: 'ClienteDetail',
     component: ClienteDetail
+  },
+  {
+    path: '/whatsapp',
+    name: 'WhatsAppConfig',
+    component: WhatsAppConfig
   }
 ]
 

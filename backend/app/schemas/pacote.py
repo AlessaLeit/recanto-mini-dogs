@@ -5,9 +5,9 @@ Obs.: mantém compatibilidade com o restante do código já existente.
 
 from datetime import date, datetime
 from enum import Enum
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .agendamento import AgendamentoResponse
 
@@ -74,6 +74,10 @@ class PacoteCreate(BaseModel):
         default_factory=list,
         description="Outros cachorros do mesmo cliente incluídos neste pacote"
     )
+    valores_adicionais: Dict[int, float] = Field(
+        default_factory=dict,
+        description="Valor do banho por cachorro adicional (id -> valor); se omitido para um id usa valor_banho_base"
+    )
     tipo_plano: TipoPlano
 
     dia_da_semana: Optional[DiaSemana] = None
@@ -95,6 +99,10 @@ class PacoteUpdate(BaseModel):
     limite_banhos_mes: Optional[int] = None
     ativo: Optional[bool] = None
     cachorros_adicionais_ids: Optional[List[int]] = None
+    valores_cachorros: Optional[Dict[int, float]] = Field(
+        default=None,
+        description="Valor do banho por cachorro adicional (id -> valor); cachorros sem entrada usam valor_banho_base"
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -110,6 +118,8 @@ class PacoteResponse(BaseModel):
     valor_banho_base: float
     valor_cobrado: float
     valor_transporte: float = 0.0
+    valores_cachorros: Dict[str, float] = Field(default_factory=dict)
+    valor_banho_equivalente: float = 0.0
     valor_pago: float = 0.0
     pagamentos: List[PagamentoResponse] = []
     ativo: bool
@@ -117,6 +127,8 @@ class PacoteResponse(BaseModel):
 
     pet_nome: Optional[str] = None
     cliente_nome: Optional[str] = None
+    cliente_whatsapp: Optional[str] = None
+    cliente_envio_comanda: Optional[str] = None
     cachorros: List[CachorroPacoteResponse] = Field(default_factory=list, validation_alias="cachorros_todos")
     status_pagamento: str
 
@@ -130,6 +142,12 @@ class PacoteResponse(BaseModel):
     # a chave 'cachorros' (não 'cachorros_todos'), e sem populate_by_name a busca
     # por alias falha silenciosamente e cai no default [].
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    @field_validator("valores_cachorros", mode="before")
+    @classmethod
+    def _valores_cachorros_default(cls, v):
+        # Coluna no banco é nullable (pacotes antigos/sem customização ficam NULL).
+        return v or {}
 
     @model_validator(mode="after")
     def _calcular_valor_pago(self):

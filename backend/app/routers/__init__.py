@@ -9,6 +9,7 @@ from .banhos import router as banhos_router
 from .relatorios import router as relatorios_router
 from .agendamentos import router as agendamentos_router
 from .auth import router as auth_router
+from .whatsapp import router as whatsapp_router
 
 # Router principal que agrega todos os sub-routers
 api_router = APIRouter()
@@ -20,5 +21,6 @@ api_router.include_router(pacotes_router, prefix="/pacotes", tags=["Pacotes"])
 api_router.include_router(banhos_router, prefix="/banhos", tags=["Banhos"])
 api_router.include_router(relatorios_router, prefix="/relatorios", tags=["Relatórios"])
 api_router.include_router(agendamentos_router, prefix="/agendamentos", tags=["Agendamentos"])
+api_router.include_router(whatsapp_router, prefix="/whatsapp", tags=["WhatsApp"])
 
 __all__ = ["api_router"]

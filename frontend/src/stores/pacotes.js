@@ -142,6 +142,16 @@ export const usePacotesStore = defineStore('pacotes', () => {
     }
   }
 
+  async function enviarComanda(id) {
+    try {
+      const response = await pacoteApi.enviarComanda(id)
+      return response.data
+    } catch (err) {
+      console.error(err.response?.data?.detail || 'Erro ao enviar comanda por WhatsApp')
+      throw err
+    }
+  }
+
   // ✅ NOVO: Atualizar apenas a data de um agendamento
   async function updateAgendamentoData(id, data_banho) {
     try {
@@ -234,6 +244,7 @@ export const usePacotesStore = defineStore('pacotes', () => {
     atualizarPacote,
     deletarPacote,
     fecharPacote,
+    enviarComanda,
     registrarPagamento,
     atualizarPagamento,
     deletarPagamento,

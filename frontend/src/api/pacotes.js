@@ -23,6 +23,8 @@ export const pacoteApi = {
 
   fechar: (id) => api.patch(`/pacotes/${id}/fechar`),
 
+  enviarComanda: (id) => api.post(`/pacotes/${id}/enviar-comanda`),
+
   // Agendamentos 
   listarAgendamentosPacote: (pacoteId) => api.get(`/pacotes/${pacoteId}/agendamentos`),
   

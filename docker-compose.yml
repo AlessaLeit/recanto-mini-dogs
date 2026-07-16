@@ -18,6 +18,35 @@ services:
     networks:
       - petshop_network
 
+  evolution_api:
+    image: evoapicloud/evolution-api:latest
+    container_name: petshop_evolution
+    environment:
+      SERVER_URL: http://evolution_api:8080
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres_local:5432/${EVOLUTION_DB_NAME:-evolution}?schema=evolution_api
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
+      DATABASE_SAVE_DATA_CONTACTS: "false"
+      DATABASE_SAVE_DATA_CHATS: "false"
+      CACHE_REDIS_ENABLED: "false"
+      CACHE_LOCAL_ENABLED: "true"
+      CORS_ORIGIN: "*"
+      LOG_LEVEL: "INFO"
+    # Sem 'ports': só acessível dentro da rede interna do Docker. O backend
+    # expõe o QR code / status através de endpoints autenticados (JWT) em
+    # /api/v1/whatsapp/*, então não precisamos publicar a porta 8080 do
+    # Evolution API na máquina/host.
+    volumes:
+      - evolution_instances:/evolution/instances
+    depends_on:
+      postgres_local:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - petshop_network
+
   backend:
     # extra_hosts:
     #  - "host.docker.internal:host-gateway"  # Minha rede docker interna vai rodar utilizando a rede da minha máquina / host
@@ -35,11 +64,16 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres_local:5432/${POSTGRES_DB}
       DEBUG: "true"
       LOG_LEVEL: "debug"
+      EVOLUTION_API_URL: http://evolution_api:8080
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      EVOLUTION_INSTANCE_NAME: ${EVOLUTION_INSTANCE_NAME:-recanto-minidogs}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
       postgres_local:
         condition: service_healthy
+      evolution_api:
+        condition: service_started
     volumes:
       - ./backend:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level debug
@@ -76,3 +110,4 @@ networks:
 
 volumes:
   pgdata:
+  evolution_instances:

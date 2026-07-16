@@ -11,7 +11,7 @@ from app.schemas import ClienteCreate, ClienteUpdate, ClienteResponse, ClienteWi
 router = APIRouter(tags=["Clientes"], redirect_slashes=True)
 
 
-@router.post("/", response_model=ClienteResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=ClienteWithCachorros, status_code=status.HTTP_201_CREATED)
 def criar_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
     """
     Cria um novo cliente.
@@ -20,7 +20,7 @@ def criar_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
     db.add(db_cliente)
     db.commit()
     db.refresh(db_cliente)
-    return ClienteResponse.model_validate(db_cliente).model_dump()
+    return ClienteWithCachorros.model_validate(db_cliente).model_dump()
 
 @router.get("/", response_model=List[ClienteWithCachorros])
 def listar_clientes(
@@ -57,7 +57,7 @@ def obter_cliente(cliente_id: int, db: Session = Depends(get_db)):
     return ClienteWithCachorros.model_validate(cliente).model_dump()
 
 
-@router.put("/{cliente_id}", response_model=ClienteResponse)
+@router.put("/{cliente_id}", response_model=ClienteWithCachorros)
 def atualizar_cliente(
     cliente_id: int,
     cliente_update: ClienteUpdate,
@@ -69,15 +69,18 @@ def atualizar_cliente(
     db_cliente = db.query(Cliente).filter(Cliente.id == cliente_id).first()
     if not db_cliente:
         raise HTTPException(status_code=404, detail="Cliente não encontrado")
-    
+
     # Atualiza apenas campos fornecidos
     update_data = cliente_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(db_cliente, field, value)
-    
+
     db.commit()
     db.refresh(db_cliente)
-    return ClienteResponse.model_validate(db_cliente).model_dump()
+    # Retorna com os cachorros incluídos (mesmo formato do GET), para que o
+    # frontend não perca a lista de pets ao substituir o cliente localmente
+    # após a edição.
+    return ClienteWithCachorros.model_validate(db_cliente).model_dump()
 
 @router.delete("/{cliente_id}", status_code=status.HTTP_204_NO_CONTENT)
 def deletar_cliente(cliente_id: int, db: Session = Depends(get_db)):

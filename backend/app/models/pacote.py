@@ -2,10 +2,10 @@
 Model Pacote - Representa um plano de banhos contratado.
 Um pacote pode ter múltiplos banhos e pagamentos registrados.
 """
-from sqlalchemy import String, Text, Float, ForeignKey, Boolean, DateTime, Date, func, Enum, Table, Column, Integer
+from sqlalchemy import String, Text, Float, ForeignKey, Boolean, DateTime, Date, func, Enum, Table, Column, Integer, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict
 from datetime import datetime, date
 import enum
 
@@ -70,6 +70,12 @@ class Pacote(Base):
 
     # Valor de transporte para o pacote
     valor_transporte: Mapped[float] = mapped_column(Float, default=0.0, server_default="0.0", nullable=False)
+
+    # Valor do banho por cachorro adicional (pacotes multi-cachorro), chave = id
+    # do cachorro (string) e valor = preço do banho dele. Cachorros sem entrada
+    # aqui usam valor_banho_base como padrão. O cachorro principal sempre usa
+    # valor_banho_base diretamente (nunca entra neste dicionário).
+    valores_cachorros: Mapped[Optional[Dict[str, float]]] = mapped_column(JSON, nullable=True)
 
 
     # Dia da semana escolhido para gerar agendamentos automáticos
@@ -174,6 +180,24 @@ class Pacote(Base):
         return todos
 
     @property
+    def valor_banho_equivalente(self) -> float:
+        """
+        Valor do banho do dia somando todos os cachorros do pacote. O principal
+        sempre usa valor_banho_base; cada adicional usa seu valor customizado em
+        valores_cachorros, ou valor_banho_base como padrão (dobra o valor) se não
+        houver customização para ele.
+        """
+        total = self.valor_banho_base or 0.0
+        valores = self.valores_cachorros or {}
+        principal_id = self.cachorro.id if self.cachorro else None
+        for c in (self.cachorros_adicionais or []):
+            if c.id == principal_id:
+                continue
+            valor_custom = valores.get(str(c.id))
+            total += valor_custom if valor_custom is not None else (self.valor_banho_base or 0.0)
+        return total
+
+    @property
     def pet_nome(self) -> Optional[str]:
         """Retorna o(s) nome(s) do(s) pet(s) vinculado(s), separados por vírgula"""
         nomes = [c.nome for c in self.cachorros_todos if c and c.nome]
@@ -183,6 +207,16 @@ class Pacote(Base):
     def cliente_nome(self) -> Optional[str]:
         """Retorna o nome do cliente vinculado"""
         return self.cachorro.cliente.nome if self.cachorro and self.cachorro.cliente else None
+
+    @property
+    def cliente_whatsapp(self) -> Optional[str]:
+        """Retorna o WhatsApp do cliente vinculado (usado para envio de comanda)."""
+        return self.cachorro.cliente.whatsapp if self.cachorro and self.cachorro.cliente else None
+
+    @property
+    def cliente_envio_comanda(self) -> Optional[str]:
+        """Retorna a preferência de envio de comanda do cliente ('whatsapp' ou 'impresso')."""
+        return self.cachorro.cliente.envio_comanda if self.cachorro and self.cachorro.cliente else None
 
     def to_dict(self) -> dict:
         """Serialização completa incluindo pet nome e agendamentos para frontend."""
@@ -195,12 +229,16 @@ class Pacote(Base):
             "valor_banho_base": self.valor_banho_base,
             "valor_cobrado": self.valor_cobrado,
             "valor_transporte": self.valor_transporte,
+            "valores_cachorros": self.valores_cachorros or {},
+            "valor_banho_equivalente": self.valor_banho_equivalente,
             "valor_pago": self.valor_pago_total, # Mantém compatibilidade com UI que espera 'valor_pago'
             "fechado": self.fechado,
             "ativo": self.ativo,
             "criado_em": self.criado_em.isoformat() if self.criado_em else None,
             "pet_nome": self.pet_nome,
             "cliente_nome": self.cliente_nome,
+            "cliente_whatsapp": self.cliente_whatsapp,
+            "cliente_envio_comanda": self.cliente_envio_comanda,
             "cachorros": [{"id": c.id, "nome": c.nome} for c in self.cachorros_todos],
             "status_pagamento": self.status_pagamento,
             "limite_banhos_mes": self.limite_banhos_mes,
