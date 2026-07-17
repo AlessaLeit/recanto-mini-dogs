@@ -142,6 +142,23 @@ export const usePacotesStore = defineStore('pacotes', () => {
     }
   }
 
+  async function reabrirPacote(id) {
+    try {
+      const response = await pacoteApi.reabrir(id)
+      const index = pacotes.value.findIndex(p => p.id === id)
+      if (index !== -1) {
+        pacotes.value[index] = response.data
+      }
+      if (pacoteAtual.value?.id === id) {
+        pacoteAtual.value = response.data
+      }
+      return response.data
+    } catch (err) {
+      console.error(err.response?.data?.detail || 'Erro ao reabrir pacote')
+      throw err
+    }
+  }
+
   async function enviarComanda(id) {
     try {
       const response = await pacoteApi.enviarComanda(id)
@@ -244,6 +261,7 @@ export const usePacotesStore = defineStore('pacotes', () => {
     atualizarPacote,
     deletarPacote,
     fecharPacote,
+    reabrirPacote,
     enviarComanda,
     registrarPagamento,
     atualizarPagamento,

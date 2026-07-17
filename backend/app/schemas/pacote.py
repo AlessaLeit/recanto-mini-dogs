@@ -123,6 +123,7 @@ class PacoteResponse(BaseModel):
     valor_pago: float = 0.0
     pagamentos: List[PagamentoResponse] = []
     ativo: bool
+    fechado: bool = False
     criado_em: datetime
 
     pet_nome: Optional[str] = None

@@ -66,9 +66,15 @@
 
     <!-- Ações -->
     <div class="actions-bar">
-      <button @click="showAddExtra = true" class="btn btn-primario">
+      <button v-if="!pacote?.fechado" @click="showAddExtra = true" class="btn btn-primario">
         + Adicionar Banho Extra
       </button>
+      <div v-else class="pacote-fechado-aviso">
+        🔒 Pacote fechado — os banhos não podem ser alterados.
+        <button @click="reabrirPacoteAction" class="btn btn-ghost" :disabled="reabrindoPacote">
+          {{ reabrindoPacote ? 'Reabrindo...' : '🔓 Reabrir Pacote' }}
+        </button>
+      </div>
     </div>
 
     <!-- Tabela de Agendamentos -->
@@ -83,21 +89,21 @@
             <th>Itens Extras</th>
             <th>Valor Banho</th>
             <th>Valor Extra</th>
-            <th>Ações</th>
+            <th v-if="!pacote?.fechado">Ações</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="ag in agendamentos" :key="ag.id" :class="ag.status_presenca">
             <td><strong>{{ formatarData(ag.data_banho) }}</strong></td>
-            <td class="clickable-cell" @click="abrirEditarExtras(ag)">
+            <td :class="{ 'clickable-cell': !pacote?.fechado }" @click="!pacote?.fechado && abrirEditarExtras(ag)">
               <span class="status-badge" :class="ag.status_presenca">
                 {{ ag.status_presenca?.toUpperCase() }}
               </span>
             </td>
-            <td class="clickable-cell" @click="abrirEditarExtras(ag)">{{ ag.extras?.info || '-' }}</td>
+            <td :class="{ 'clickable-cell': !pacote?.fechado }" @click="!pacote?.fechado && abrirEditarExtras(ag)">{{ ag.extras?.info || '-' }}</td>
             <td>R$ {{ formatarValor(valorBanhoEquivalente) }}</td>
-            <td class="clickable-cell" @click="abrirEditarExtras(ag)">R$ {{ formatarValor(ag.extras?.valor_extra || 0) }}</td>
-            <td>
+            <td :class="{ 'clickable-cell': !pacote?.fechado }" @click="!pacote?.fechado && abrirEditarExtras(ag)">R$ {{ formatarValor(ag.extras?.valor_extra || 0) }}</td>
+            <td v-if="!pacote?.fechado">
               <div class="acoes">
                 <button @click="abrirEditarExtras(ag)" class="btn-acao btn-acao-verde" title="Adicionar Item Extra">+</button>
                 <button @click="abrirEditarData(ag)" class="btn-acao btn-acao-ghost" title="Editar data">📅</button>
@@ -163,8 +169,17 @@
           >
             {{ enviandoComanda ? 'Enviando...' : '💬 Enviar Comanda' }}
           </button>
-          <button v-if="pacote?.status_pagamento === 'em_aberto' || pacote?.status_pagamento === 'parcial' || pacote?.status_pagamento === 'atrasado'" @click="abrirPagamento(true)" class="btn btn-ghost" style="border-color: var(--dourado); color: var(--marrom); margin-left: 0.5rem;">🔒 Fechar e Pagar</button>
-          <button v-if="pacote?.status_pagamento !== 'pago'" @click="abrirPagamento(false)" class="btn btn-primario" style="margin-left: 0.5rem;">💰 Registrar Pagamento</button>
+          <button
+            v-if="!pacote?.fechado"
+            @click="fecharPacoteAction"
+            class="btn btn-ghost"
+            style="border-color: var(--dourado); color: var(--marrom); margin-left: 0.5rem;"
+            :disabled="!todosBanhosResolvidos || fechandoPacote"
+            :title="todosBanhosResolvidos ? '' : 'Marque todos os banhos como concluído ou faltou antes de fechar'"
+          >
+            {{ fechandoPacote ? 'Fechando...' : '🔒 Fechar Pacote' }}
+          </button>
+          <button v-if="pacote?.status_pagamento !== 'pago'" @click="abrirPagamento()" class="btn btn-primario" style="margin-left: 0.5rem;">💰 Registrar Pagamento</button>
         </div>
       </div>
       
@@ -424,6 +439,8 @@ const pacote = ref(null)
 const agendamentos = ref([])
 const loading = ref(false)
 const enviandoComanda = ref(false)
+const fechandoPacote = ref(false)
+const reabrindoPacote = ref(false)
 
 // Modais
 const showEditData = ref(false)
@@ -471,6 +488,12 @@ const cachorroPrincipalPacote = computed(() =>
 
 const cachorrosAdicionaisPacote = computed(() =>
   (pacote.value?.cachorros || []).filter(c => c.id !== pacote.value?.cachorro_id)
+)
+
+// Só permite fechar o pacote quando todos os banhos do ciclo já foram
+// resolvidos (concluído ou faltou — nenhum pendente).
+const todosBanhosResolvidos = computed(() =>
+  agendamentos.value.length > 0 && agendamentos.value.every(ag => ag.status_presenca !== 'pendente')
 )
 
 const totalPacote = computed(() => {
@@ -540,16 +563,40 @@ async function salvarNovaData() {
   } catch (err) {}
 }
 
-function abrirPagamento(fecharAoPagar = false) {
+function abrirPagamento() {
   pagamentoEditando.value = null
   formPagamento.value = {
     valor_pago: valorRestante.value > 0 ? valorRestante.value : pacote.value.valor_cobrado,
     data_pagamento: new Date().toISOString().split('T')[0],
     tipo_pagamento: 'pix',
-    fechar_pacote: fecharAoPagar,
+    fechar_pacote: false,
     observacao: ''
   };
   showModalPagamento.value = true
+}
+
+async function fecharPacoteAction() {
+  fechandoPacote.value = true
+  try {
+    await pacotesStore.fecharPacote(pacoteId.value)
+    await carregarPacote()
+  } catch (err) {
+    alert('Erro ao fechar pacote: ' + (err.response?.data?.detail || err.message || err))
+  } finally {
+    fechandoPacote.value = false
+  }
+}
+
+async function reabrirPacoteAction() {
+  reabrindoPacote.value = true
+  try {
+    await pacotesStore.reabrirPacote(pacoteId.value)
+    await carregarPacote()
+  } catch (err) {
+    alert('Erro ao reabrir pacote: ' + (err.response?.data?.detail || err.message || err))
+  } finally {
+    reabrindoPacote.value = false
+  }
 }
 
 function abrirEditarPagamento(pg) {
@@ -667,7 +714,7 @@ async function salvarDadosPacote() {
     await carregarPacote()
   } catch (err) {
     console.error('Erro ao atualizar pacote:', err)
-    alert('Erro ao salvar as alterações do pacote.')
+    alert('Erro ao salvar as alterações do pacote: ' + (err.response?.data?.detail || err.message || err))
   }
 }
 
@@ -870,6 +917,19 @@ onMounted(carregarPacote)
   margin-bottom: 1.4rem;
   display: flex;
   justify-content: flex-end;
+}
+
+.pacote-fechado-aviso {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--creme);
+  border: 2px solid var(--creme-escuro);
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
 }
 
 .footer-danger-zone {

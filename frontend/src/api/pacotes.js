@@ -23,6 +23,8 @@ export const pacoteApi = {
 
   fechar: (id) => api.patch(`/pacotes/${id}/fechar`),
 
+  reabrir: (id) => api.patch(`/pacotes/${id}/reabrir`),
+
   enviarComanda: (id) => api.post(`/pacotes/${id}/enviar-comanda`),
 
   // Agendamentos 

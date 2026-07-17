@@ -14,6 +14,18 @@ from datetime import date
 
 router = APIRouter(tags=["Agendamentos"], redirect_slashes=True)
 
+
+def _bloquear_se_pacote_fechado(agendamento: Agendamento) -> None:
+    """
+    Impede alterações num agendamento vinculado a um pacote já fechado.
+    Banhos avulsos (sem pacote) nunca são bloqueados por esta regra.
+    """
+    if agendamento.pacote_id is not None and agendamento.pacote and agendamento.pacote.fechado:
+        raise HTTPException(
+            status_code=400,
+            detail="Este pacote está fechado. Reabra o pacote para editar os banhos."
+        )
+
 @router.post("/", response_model=AgendamentoResponse, status_code=status.HTTP_201_CREATED)
 def criar_agendamento(agendamento: AgendamentoCreate, db: Session = Depends(get_db)):
     """
@@ -138,13 +150,22 @@ def atualizar_agendamento(
     db_ag = db.query(Agendamento).filter(Agendamento.id == agendamento_id).first()
     if not db_ag:
         raise HTTPException(status_code=404, detail="Agendamento não encontrado")
-    
+
+    _bloquear_se_pacote_fechado(db_ag)
+
     update_dict = update_data.model_dump(exclude_unset=True)
     for field, value in update_dict.items():
         setattr(db_ag, field, value)
-    
+
     db.commit()
     db.refresh(db_ag)
+
+    # Se o status de presença mudou, verifica se todos os agendamentos do
+    # pacote já foram resolvidos (nenhum mais pendente) — se sim, fecha o
+    # ciclo automaticamente e envia a comanda por WhatsApp, se configurado.
+    if "status_presenca" in update_dict and db_ag.pacote_id is not None:
+        PacoteService(db).fechar_se_completo(db_ag.pacote_id)
+
     return AgendamentoResponse.model_validate(db_ag).model_dump()
 
 
@@ -161,9 +182,11 @@ def atualizar_data_agendamento(
     db_ag = db.query(Agendamento).filter(Agendamento.id == agendamento_id).first()
     if not db_ag:
         raise HTTPException(status_code=404, detail="Agendamento não encontrado")
-    
+
+    _bloquear_se_pacote_fechado(db_ag)
+
     db_ag.data_banho = data_banho
-    
+
     db.commit()
     db.refresh(db_ag)
     return AgendamentoResponse.model_validate(db_ag).model_dump()
@@ -177,7 +200,9 @@ def deletar_agendamento(agendamento_id: int, db: Session = Depends(get_db)):
     db_ag = db.query(Agendamento).filter(Agendamento.id == agendamento_id).first()
     if not db_ag:
         raise HTTPException(status_code=404, detail="Agendamento não encontrado")
-    
+
+    _bloquear_se_pacote_fechado(db_ag)
+
     db.delete(db_ag)
     db.commit()
     return None

@@ -329,7 +329,7 @@ async function criarPacote() {
     novoPacote.value = { cachorro_id: null, cachorros_adicionais_ids: [], tipo_plano: 'semanal', dia_da_semana: 'terca', valor_banho_base: 0, valor_transporte: 0, valor_cobrado: 0 }
     limparValoresAdicionais()
     buscaCachorroNovo.value = ''
-  } catch (err) { alert('Erro ao criar pacote: ' + err) }
+  } catch (err) { alert('Erro ao criar pacote: ' + (err.response?.data?.detail || err.message || err)) }
 }
 function verDetalhes(pacote) { router.push(`/pacotes/${pacote.id}`) }
 

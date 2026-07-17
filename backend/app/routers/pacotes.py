@@ -3,16 +3,15 @@ Router Pacotes - CRUD, pagamento, geração automática agend
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_
 from typing import List, Any, Optional
+from datetime import date
 
 from app.database import get_db
 from app import models, schemas
-from app.services.pacote_service import PacoteService
+from app.services.pacote_service import PacoteService, gerar_datas_ciclo
 from app.services import whatsapp_service
 from app.auth import get_current_user
-import logging
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(
     tags=["Pacotes"],
@@ -49,6 +48,39 @@ def listar_pacotes(
 
     return [schemas.PacoteResponse.model_validate(p).model_dump() for p in pacotes]
 
+def _pacote_aberto_do_cachorro(db: Session, cachorro_id: int, excluir_pacote_id: Optional[int] = None):
+    """
+    Retorna o pacote em aberto (ativo e não fechado) do cachorro, seja como
+    principal ou como cachorro adicional, ou None se não houver nenhum.
+    """
+    query = db.query(models.Pacote).filter(
+        models.Pacote.ativo == True,
+        models.Pacote.fechado == False,
+        or_(
+            models.Pacote.cachorro_id == cachorro_id,
+            models.Pacote.cachorros_adicionais.any(models.Cachorro.id == cachorro_id)
+        )
+    )
+    if excluir_pacote_id is not None:
+        query = query.filter(models.Pacote.id != excluir_pacote_id)
+    return query.first()
+
+
+def _validar_sem_pacote_aberto(db: Session, cachorros: List["models.Cachorro"], excluir_pacote_id: Optional[int] = None):
+    """
+    Garante que nenhum dos cachorros informados já tenha um pacote em aberto
+    (regra: um cachorro só pode estar em um pacote em aberto por vez).
+    """
+    for c in cachorros:
+        existente = _pacote_aberto_do_cachorro(db, c.id, excluir_pacote_id)
+        if existente:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{c.nome} já possui um pacote em aberto (#{existente.id}). "
+                       f"Feche o pacote atual antes de criar um novo para este cachorro."
+            )
+
+
 @router.post("/", response_model=schemas.PacoteResponse, status_code=status.HTTP_201_CREATED)
 def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Session = Depends(get_db)):
     """Cria um novo pacote para um cachorro específico."""
@@ -59,7 +91,9 @@ def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Session = Depends(get_d
     ).first()
     if not cachorro:
         raise HTTPException(status_code=404, detail="Cachorro não encontrado ou inativo")
-    
+
+    _validar_sem_pacote_aberto(db, [cachorro])
+
     # Cria o pacote
     dados_pacote = pacote_criar.model_dump()
     dados_pacote.pop('limite_banhos_mes', None)
@@ -94,6 +128,7 @@ def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Session = Depends(get_d
                     status_code=400,
                     detail="Todos os cachorros adicionais devem pertencer ao mesmo cliente do cachorro principal"
                 )
+            _validar_sem_pacote_aberto(db, cachorros_extras)
 
     db_pacote = models.Pacote(**dados_pacote)
     if cachorros_extras:
@@ -111,53 +146,12 @@ def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Session = Depends(get_d
     db.commit()
     db.refresh(db_pacote)
 
-    # ==============================================================
-    # Geração automática de agendamentos para o mês atual.
-    # Regra:
-    # - Semanal: 4 datas no mesmo dia da semana (dia_da_semana)
-    # - Quinzenal: 2 datas com intervalo de 15 dias a partir da 1ª ocorrência no mês
-    # - Mensal: 1 data (primeira ocorrência no mês)
-    # ==============================================================
-    from datetime import date, timedelta
-    import calendar
-
-
+    # Geração automática de agendamentos para o mês atual, seguindo a mesma
+    # regra usada para gerar o pacote do mês seguinte (ver gerar_datas_ciclo).
     hoje = date.today()
-    primeiro_dia_mes = date(hoje.year, hoje.month, 1)
-    ultimo_dia_mes = date(hoje.year, hoje.month, calendar.monthrange(hoje.year, hoje.month)[1])
-
-    mapa_dow = {
-        "terca": 1,   # Segunda=0
-        "quarta": 2,
-        "quinta": 3,
-        "sexta": 4,
-        "sabado": 5,
-    }
-
-    alvo_dow = mapa_dow.get(db_pacote.dia_da_semana.value)
-    if alvo_dow is None:
-        raise HTTPException(status_code=400, detail="Dia da semana inválido")
-
-    def primeira_ocorrencia_no_mes() -> Optional[date]:
-        d = primeiro_dia_mes
-        while d <= ultimo_dia_mes:
-            if d.weekday() == alvo_dow:
-                return d
-            d += timedelta(days=1)
-        return None
-
-    primeira = primeira_ocorrencia_no_mes()
-    datas: List[date] = []
-
-    if db_pacote.tipo_plano.value == "semanal" and primeira:
-        datas = [primeira + timedelta(days=7 * i) for i in range(4)]
-    elif db_pacote.tipo_plano.value == "quinzenal" and primeira:
-        datas = [primeira + timedelta(days=15 * i) for i in range(2)]
-    elif db_pacote.tipo_plano.value == "mensal" and primeira:
-        datas = [primeira]
-
-    # Garante que todas datas estão dentro do mês (caso 'primeira' caia no fim do mês)
-    datas_validas = [d for d in datas if primeiro_dia_mes <= d <= ultimo_dia_mes]
+    datas_validas = gerar_datas_ciclo(
+        db_pacote.tipo_plano.value, db_pacote.dia_da_semana.value, hoje.year, hoje.month
+    )
 
     # Import aqui para evitar dependência circular no carregamento.
     from app.models import Agendamento
@@ -241,6 +235,7 @@ def atualizar_pacote(pacote_id: int, pacote_atualizar: schemas.PacoteUpdate, db:
                     status_code=400,
                     detail="Todos os cachorros adicionais devem pertencer ao mesmo cliente do cachorro principal"
                 )
+            _validar_sem_pacote_aberto(db, cachorros_extras, excluir_pacote_id=pacote.id)
         pacote.cachorros_adicionais = cachorros_extras
 
     db.commit()
@@ -248,25 +243,13 @@ def atualizar_pacote(pacote_id: int, pacote_atualizar: schemas.PacoteUpdate, db:
 
     return schemas.PacoteResponse.model_validate(pacote).model_dump()
 
-def _tentar_enviar_comanda(pacote: models.Pacote) -> None:
-    """
-    Envia a comanda por WhatsApp se o cliente tiver essa preferência configurada.
-    Best-effort: qualquer falha (WhatsApp desconectado, número inválido, etc.)
-    é apenas logada, nunca interrompe o fluxo de fechamento do pacote.
-    """
-    cliente = pacote.cachorro.cliente if pacote.cachorro else None
-    if not cliente or cliente.envio_comanda != "whatsapp" or not cliente.whatsapp:
-        return
-    try:
-        mensagem = whatsapp_service.formatar_comanda_mensagem(pacote)
-        whatsapp_service.enviar_texto(cliente.whatsapp, mensagem)
-    except Exception as e:
-        logger.warning(f"Falha ao enviar comanda por WhatsApp (pacote {pacote.id}): {e}")
-
-
 @router.patch("/{pacote_id}/fechar", response_model=schemas.PacoteResponse)
 def fechar_pacote(pacote_id: int, db: Session = Depends(get_db)):
-    """Marca o pacote como fechado (ciclo concluído, aguardando acerto)."""
+    """
+    Marca o pacote como fechado (ciclo concluído, aguardando acerto).
+    Só permite fechar quando todos os banhos do ciclo já foram resolvidos
+    (concluído ou faltou — nenhum pendente).
+    """
     pacote = db.query(models.Pacote).options(
         joinedload(models.Pacote.cachorro).joinedload(models.Cachorro.cliente),
         joinedload(models.Pacote.agendamentos)
@@ -275,10 +258,39 @@ def fechar_pacote(pacote_id: int, db: Session = Depends(get_db)):
     if not pacote:
         raise HTTPException(status_code=404, detail="Pacote não encontrado")
 
+    if not pacote.agendamentos:
+        raise HTTPException(status_code=400, detail="Este pacote não tem agendamentos para fechar.")
+
+    pendentes = [ag for ag in pacote.agendamentos if ag.status_presenca == "pendente"]
+    if pendentes:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Ainda há {len(pendentes)} banho(s) pendente(s). "
+                   f"Marque todos como concluído ou faltou antes de fechar o pacote."
+        )
+
     pacote.fechado = True
     db.commit()
     db.refresh(pacote)
-    _tentar_enviar_comanda(pacote)
+    whatsapp_service.enviar_comanda_se_configurado(pacote)
+    PacoteService(db).criar_pacote_seguinte(pacote)
+    return schemas.PacoteResponse.model_validate(pacote).model_dump()
+
+
+@router.patch("/{pacote_id}/reabrir", response_model=schemas.PacoteResponse)
+def reabrir_pacote(pacote_id: int, db: Session = Depends(get_db)):
+    """
+    Destrava o pacote (volta fechado=False) para permitir corrigir banhos
+    (status, itens extras, datas) esquecidos ou errados. Depois de corrigir,
+    o pacote precisa passar pelo fechamento novamente.
+    """
+    pacote = db.query(models.Pacote).filter(models.Pacote.id == pacote_id).first()
+    if not pacote:
+        raise HTTPException(status_code=404, detail="Pacote não encontrado")
+
+    pacote.fechado = False
+    db.commit()
+    db.refresh(pacote)
     return schemas.PacoteResponse.model_validate(pacote).model_dump()
 
 
@@ -343,7 +355,6 @@ def registrar_pagamento(
 ):
     """Registra pagamento de um pacote usando o serviço."""
     service = PacoteService(db)
-    from datetime import date
 
     valor_pago = dados.get("valor_pago")
     data_str = dados.get("data_pagamento")
@@ -443,7 +454,15 @@ def adicionar_agendamento_extra(
     db: Session = Depends(get_db)
 ):
     """Cria um agendamento extra sem validar o limite do plano."""
-    from datetime import date
+    pacote = db.query(models.Pacote).filter(models.Pacote.id == pacote_id).first()
+    if not pacote:
+        raise HTTPException(status_code=404, detail="Pacote não encontrado")
+    if pacote.fechado:
+        raise HTTPException(
+            status_code=400,
+            detail="Este pacote está fechado. Reabra o pacote para adicionar banhos."
+        )
+
     db_ag = models.Agendamento(
         pacote_id=pacote_id,
         data_banho=date.fromisoformat(data_banho),

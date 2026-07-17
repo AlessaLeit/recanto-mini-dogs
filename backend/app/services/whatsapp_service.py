@@ -10,12 +10,15 @@ Todas as chamadas HTTP são best-effort: falhas aqui nunca devem derrubar o
 fluxo principal do app (ex.: fechar um pacote continua funcionando mesmo se
 o WhatsApp estiver desconectado).
 """
+import logging
 import re
 from typing import Any, Dict, Optional
 
 import httpx
 
 from app.database import settings
+
+logger = logging.getLogger(__name__)
 
 
 class WhatsAppNaoConfigurado(Exception):
@@ -172,6 +175,22 @@ def formatar_comanda_mensagem(pacote) -> str:
 
     linhas.append("")
     linhas.append(f"💰 *Total: R$ {pacote.valor_cobrado:.2f}*".replace(".", ","))
-    linhas.append(f"Status: {_STATUS_LABELS.get(pacote.status_pagamento, pacote.status_pagamento)}")
-
     return "\n".join(linhas)
+
+
+def enviar_comanda_se_configurado(pacote) -> None:
+    """
+    Envia a comanda por WhatsApp se o cliente do pacote tiver essa preferência
+    configurada (envio_comanda == 'whatsapp') e um número cadastrado.
+    Best-effort: qualquer falha (WhatsApp desconectado, número inválido, etc.)
+    é apenas logada, nunca interrompe o fluxo que chamou esta função (ex.:
+    fechamento manual ou automático de um pacote).
+    """
+    cliente = pacote.cachorro.cliente if pacote.cachorro else None
+    if not cliente or cliente.envio_comanda != "whatsapp" or not cliente.whatsapp:
+        return
+    try:
+        mensagem = formatar_comanda_mensagem(pacote)
+        enviar_texto(cliente.whatsapp, mensagem)
+    except Exception as e:
+        logger.warning(f"Falha ao enviar comanda por WhatsApp (pacote {pacote.id}): {e}")
