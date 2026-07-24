@@ -6,6 +6,7 @@ from .cachorro import Cachorro, PorteCachorro
 from .pacote import Pacote, TipoPlano, Pagamento, TipoPagamento
 from .banho import Banho
 from .agendamento import Agendamento, StatusPresenca
+from .comanda_impressao import ComandaImpressao
 
 __all__ = [
     "Cliente",
@@ -17,5 +18,6 @@ __all__ = [
     "TipoPagamento",
     "Banho",
     "Agendamento",
-    "StatusPresenca"
+    "StatusPresenca",
+    "ComandaImpressao"
 ]

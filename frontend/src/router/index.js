@@ -12,6 +12,7 @@ import PacoteDetail from '../views/PacoteDetail.vue'
 import BanhosAvulsos from '../views/BanhosAvulsos.vue'
 import ClienteDetail from '../views/ClienteDetail.vue'
 import WhatsAppConfig from '../views/WhatsAppConfig.vue'
+import ComandasImpressao from '../views/ComandasImpressao.vue'
 import { useAuthStore } from '../stores/auth'
 
 const routes = [
@@ -60,6 +61,11 @@ const routes = [
     path: '/whatsapp',
     name: 'WhatsAppConfig',
     component: WhatsAppConfig
+  },
+  {
+    path: '/comandas-impressao',
+    name: 'ComandasImpressao',
+    component: ComandasImpressao
   }
 ]
 

@@ -139,42 +139,74 @@ _MESES = [
 ]
 
 
+def montar_dados_comanda(pacote) -> Dict[str, Any]:
+    """
+    Reúne os dados da comanda (pacote fechado) num formato estruturado,
+    reaproveitado tanto pela mensagem de WhatsApp quanto pela comanda impressa
+    (PDF): pet/cliente, mês do ciclo, uma linha por banho concluído
+    (data + valor + item extra, se houver), transporte e total.
+    """
+    agendamentos_concluidos = [
+        ag for ag in sorted(pacote.agendamentos, key=lambda a: a.data_banho)
+        if ag.status_presenca == "concluido"
+    ]
+
+    mes_label = None
+    if agendamentos_concluidos:
+        primeira_data = agendamentos_concluidos[0].data_banho
+        mes_label = f"{_MESES[primeira_data.month - 1]}/{primeira_data.year}"
+
+    linhas_banhos = []
+    for ag in agendamentos_concluidos:
+        valor_extra = (ag.extras or {}).get("valor_extra", 0) or 0
+        linhas_banhos.append({
+            "data": ag.data_banho,
+            "valor": pacote.valor_banho_equivalente,
+            "extra_info": (ag.extras or {}).get("info") if valor_extra else None,
+            "extra_valor": valor_extra,
+        })
+
+    return {
+        "pet_nome": pacote.pet_nome or "Pacote",
+        "cliente_nome": pacote.cliente_nome,
+        "mes_label": mes_label,
+        "banhos": linhas_banhos,
+        "transporte": pacote.valor_transporte or 0.0,
+        "total": pacote.valor_cobrado,
+        "status_label": _STATUS_LABELS.get(pacote.status_pagamento, pacote.status_pagamento),
+    }
+
+
 def formatar_comanda_mensagem(pacote) -> str:
     """
     Monta o texto da comanda (pacote fechado) no mesmo formato exibido na
     página de detalhes do cliente: datas + valor de cada banho, transporte e
     total, com o status de pagamento.
     """
+    dados = montar_dados_comanda(pacote)
+
     linhas = [
         "🐾 *Recanto Mini Dogs*",
-        f"Comanda — {pacote.pet_nome or 'Pacote'}",
+        f"Comanda — {dados['pet_nome']}",
         "",
     ]
 
-    agendamentos_concluidos = [
-        ag for ag in sorted(pacote.agendamentos, key=lambda a: a.data_banho)
-        if ag.status_presenca == "concluido"
-    ]
-
-    if agendamentos_concluidos:
-        primeira_data = agendamentos_concluidos[0].data_banho
-        linhas.append(f"📅 {_MESES[primeira_data.month - 1]}/{primeira_data.year}")
-        for ag in agendamentos_concluidos:
-            valor_extra = (ag.extras or {}).get("valor_extra", 0) or 0
-            data_fmt = ag.data_banho.strftime("%d/%m/%Y")
-            linha = f"{data_fmt} — R$ {pacote.valor_banho_equivalente:.2f}".replace(".", ",")
-            if valor_extra:
-                info = (ag.extras or {}).get("info", "")
-                linha += f" + {info or 'extra'} R$ {valor_extra:.2f}".replace(".", ",")
+    if dados["banhos"]:
+        linhas.append(f"📅 {dados['mes_label']}")
+        for banho in dados["banhos"]:
+            data_fmt = banho["data"].strftime("%d/%m/%Y")
+            linha = f"{data_fmt} — R$ {banho['valor']:.2f}".replace(".", ",")
+            if banho["extra_valor"]:
+                linha += f" + {banho['extra_info'] or 'extra'} R$ {banho['extra_valor']:.2f}".replace(".", ",")
             linhas.append(linha)
     else:
         linhas.append("Nenhum banho concluído neste ciclo.")
 
-    if pacote.valor_transporte:
-        linhas.append(f"🚗 Transporte: R$ {pacote.valor_transporte:.2f}".replace(".", ","))
+    if dados["transporte"]:
+        linhas.append(f"🚗 Transporte: R$ {dados['transporte']:.2f}".replace(".", ","))
 
     linhas.append("")
-    linhas.append(f"💰 *Total: R$ {pacote.valor_cobrado:.2f}*".replace(".", ","))
+    linhas.append(f"💰 *Total: R$ {dados['total']:.2f}*".replace(".", ","))
     return "\n".join(linhas)
 
 

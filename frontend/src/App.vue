@@ -15,6 +15,7 @@
         <li><router-link to="/clientes">👥 Clientes</router-link></li>
         <li><router-link to="/relatorios">📊 Relatórios</router-link></li>
         <li><router-link to="/whatsapp">💬 WhatsApp</router-link></li>
+        <li><router-link to="/comandas-impressao">🖨️ Comandas</router-link></li>
       </ul>
     </nav>
 

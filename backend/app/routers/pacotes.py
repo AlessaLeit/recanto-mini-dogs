@@ -10,7 +10,7 @@ from datetime import date
 from app.database import get_db
 from app import models, schemas
 from app.services.pacote_service import PacoteService, gerar_datas_ciclo
-from app.services import whatsapp_service
+from app.services import whatsapp_service, comanda_service
 from app.auth import get_current_user
 
 router = APIRouter(
@@ -272,7 +272,7 @@ def fechar_pacote(pacote_id: int, db: Session = Depends(get_db)):
     pacote.fechado = True
     db.commit()
     db.refresh(pacote)
-    whatsapp_service.enviar_comanda_se_configurado(pacote)
+    comanda_service.processar_fechamento(db, pacote)
     PacoteService(db).criar_pacote_seguinte(pacote)
     return schemas.PacoteResponse.model_validate(pacote).model_dump()
 

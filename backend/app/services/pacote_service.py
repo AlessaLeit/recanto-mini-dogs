@@ -9,7 +9,7 @@ from typing import List, Optional
 from datetime import date, timedelta
 import calendar
 from app.models import Pacote, Banho, Agendamento, Cachorro, Cliente, TipoPlano
-from app.services import whatsapp_service
+from app.services import comanda_service
 
 
 _MAPA_DIA_SEMANA = {
@@ -180,7 +180,7 @@ class PacoteService:
         self.db.refresh(pacote)
 
         if fechar_pacote:
-            whatsapp_service.enviar_comanda_se_configurado(pacote)
+            comanda_service.processar_fechamento(self.db, pacote)
             self.criar_pacote_seguinte(pacote)
 
         return pacote.to_dict()
@@ -215,7 +215,7 @@ class PacoteService:
         self.db.commit()
         self.db.refresh(pacote)
 
-        whatsapp_service.enviar_comanda_se_configurado(pacote)
+        comanda_service.processar_fechamento(self.db, pacote)
         self.criar_pacote_seguinte(pacote)
         return pacote
 
