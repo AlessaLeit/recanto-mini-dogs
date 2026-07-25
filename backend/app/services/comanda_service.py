@@ -83,30 +83,25 @@ _MARGEM = 10
 # Letreiro fixo do canil (mesmo texto do talão de pedido em papel).
 _NOME_CANIL = "Canil Recanto Mini Dogs"
 _PIX_CPF = "Chave Pix - CPF 757.124.909-00"
-_TELEFONE = "Fones (47) 98868-6391"
+_TELEFONE = "WhatsApp (47) 98868-6391"
 _ENDERECO_L1 = "Av. Expedicionarios, 2479 - Campo D'Agua Verde"
 _ENDERECO_L2 = "CEP 89466-434 - Canoinhas/SC"
 
-_MESES_ABREV_GENITIVO = [
-    "janeiro", "fevereiro", "marco", "abril", "maio", "junho",
-    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
-]
-
-# Larguras proporcionais das colunas da tabela: Qtd | Unid | Descrição | V.Unid | Total
-_COL_PROP = [0.09, 0.11, 0.44, 0.18, 0.18]
+# Larguras proporcionais das colunas da tabela: Qtd | Descrição | V.Unid | Total
+_COL_PROP = [0.12, 0.50, 0.19, 0.19]
 
 
 def _montar_linhas_tabela(dados: dict) -> List[tuple]:
-    """Converte os banhos/transporte da comanda em linhas (qtd, unid, descricao, v_unid, total)."""
+    """Converte os banhos/transporte da comanda em linhas (qtd, descricao, v_unid, total)."""
     linhas = []
     for banho in dados["banhos"]:
         data_fmt = banho["data"].strftime("%d/%m")
-        linhas.append(("1", "un", f"Banho - {data_fmt}", banho["valor"], banho["valor"]))
+        linhas.append(("1", f"Banho - {data_fmt}", banho["valor"], banho["valor"]))
         if banho["extra_valor"]:
             desc = banho["extra_info"] or "Item extra"
-            linhas.append(("1", "un", f"{desc} - {data_fmt}", banho["extra_valor"], banho["extra_valor"]))
+            linhas.append(("1", f"{desc} - {data_fmt}", banho["extra_valor"], banho["extra_valor"]))
     if dados["transporte"]:
-        linhas.append(("1", "un", "Transporte", dados["transporte"], dados["transporte"]))
+        linhas.append(("1", "Transporte", dados["transporte"], dados["transporte"]))
     return linhas
 
 
@@ -117,8 +112,8 @@ def _fmt_moeda(v: float) -> str:
 def _desenhar_comanda(c: canvas.Canvas, x: float, y: float, dados: dict) -> None:
     """
     Desenha uma comanda no quadrante (origem inferior-esquerda x, y), no estilo
-    do talão de pedido em papel do canil: cabeçalho com dados do negócio,
-    campos Data/Sr.(a)/End., tabela de itens e Total/Assinatura.
+    do talão de pedido em papel do canil: cabeçalho com logo + dados do
+    negócio, cliente/data, tabela de itens e Total/Assinatura.
     """
     pad = _MARGEM
     inner_x = x + pad
@@ -132,84 +127,85 @@ def _desenhar_comanda(c: canvas.Canvas, x: float, y: float, dados: dict) -> None
     c.rect(x + 4, y + 4, _QUAD_W - 8, _QUAD_H - 8)
     c.restoreState()
 
-    cursor = top
-
-    # --- Cabeçalho: nome do canil | "Pedido" ---
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(inner_x, cursor - 9, _NOME_CANIL)
-    c.setFont("Helvetica-Bold", 12)
-    c.drawRightString(inner_x + inner_w, cursor - 10, "Pedido")
-    cursor -= 15
-    c.setLineWidth(0.8)
-    c.line(inner_x, cursor, inner_x + inner_w, cursor)
-    cursor -= 9
-
-    # Logo (quadrada) à esquerda; textos do letreiro começam depois dela.
+    # --- Cabeçalho: nome do canil (topo, largura toda) + logo/Pix/WhatsApp/endereço ---
     logo = _obter_logo()
-    logo_lado = 26
-    texto_x = inner_x
+    logo_lado = 36
+    gap_logo = 8
+    texto_x = inner_x + (logo_lado + gap_logo if logo else 0)
+
+    linha_gap = 13
+    header_top = top - 2
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(inner_x, header_top - 12, _NOME_CANIL)
+
+    divisor_y = header_top - 19
+    c.setLineWidth(0.5)
+    c.line(inner_x, divisor_y, inner_x + inner_w, divisor_y)
+
+    info_y = divisor_y - 11
+    c.setFont("Helvetica", 9.5)
+    for linha in (_PIX_CPF, _TELEFONE, _ENDERECO_L1, _ENDERECO_L2):
+        c.drawString(texto_x, info_y, linha)
+        info_y -= linha_gap
+    header_bottom = info_y + linha_gap - 3  # fundo aproximado da última linha
+
     if logo:
+        bloco_h = divisor_y - header_bottom
+        logo_y = header_bottom + (bloco_h - logo_lado) / 2
         c.drawImage(
-            logo, inner_x, cursor - logo_lado + 8, width=logo_lado, height=logo_lado,
-            preserveAspectRatio=True, anchor="nw", mask="auto"
+            logo, inner_x, logo_y, width=logo_lado, height=logo_lado,
+            preserveAspectRatio=True, mask="auto"
         )
-        texto_x = inner_x + logo_lado + 4
 
-    c.setFont("Helvetica", 6.3)
-    c.drawString(texto_x, cursor, _PIX_CPF)
-    c.setFont("Helvetica-Bold", 7)
-    c.drawRightString(inner_x + inner_w, cursor, f"N. {dados['numero']}")
-    cursor -= 8
-    c.setFont("Helvetica", 6.3)
-    c.drawString(texto_x, cursor, _TELEFONE)
-    cursor -= 8
-    c.drawString(texto_x, cursor, _ENDERECO_L1)
-    cursor -= 8
-    c.drawString(texto_x, cursor, _ENDERECO_L2)
-    cursor -= 10
-
+    cursor = header_bottom - 6
     c.setLineWidth(0.8)
     c.line(inner_x, cursor, inner_x + inner_w, cursor)
-    cursor -= 10
+    cursor -= 14
 
-    # --- Data / Sr.(a) / End. ---
-    c.setFont("Helvetica", 7.2)
-    c.drawString(inner_x, cursor, f"Data: {dados['data_fmt']}")
-    cursor -= 10
+    # --- Cliente (esquerda) / Data (direita) ---
+    c.setFont("Helvetica", 11)
     c.drawString(inner_x, cursor, f"Sr.(a): {dados['cliente_nome'] or ''}")
-    cursor -= 10
-    c.drawString(inner_x, cursor, f"End.: {dados['endereco'] or ''}")
+    c.drawRightString(inner_x + inner_w, cursor, f"Data: {dados['data_fmt']}")
     cursor -= 8
 
-    # --- Tabela de itens ---
+    c.setLineWidth(0.5)
+    c.line(inner_x, cursor, inner_x + inner_w, cursor)
+    cursor -= 4
+
+    # --- Tabela de itens (Qtd | Descrição | V.Unid | Total) ---
     col_w = [inner_w * p for p in _COL_PROP]
     col_x = [inner_x]
     for w in col_w[:-1]:
         col_x.append(col_x[-1] + w)
 
-    row_h = 9
+    row_h = 17
     tabela_top = cursor
     c.setLineWidth(0.6)
     c.line(inner_x, tabela_top, inner_x + inner_w, tabela_top)
 
-    c.setFont("Helvetica-Bold", 6)
-    headers = ["Qtd.", "Unid.", "Descricao", "V.Unid.", "Total"]
+    c.setFont("Helvetica-Bold", 10)
+    headers = ["Qtd.", "Descricao", "V.Unid.", "Total"]
     for cx, htext in zip(col_x, headers):
-        c.drawString(cx + 2, tabela_top - 7, htext)
+        c.drawString(cx + 3, tabela_top - 12, htext)
     cursor = tabela_top - row_h
     c.line(inner_x, cursor, inner_x + inner_w, cursor)
 
-    # Reserva espaço pro rodapé (Total + Assinatura) antes de estourar o quadrante.
-    limite_y = y + pad + 26
-    c.setFont("Helvetica", 6)
-    for qtd, unid, desc, v_unid, v_total in _montar_linhas_tabela(dados):
+    # Reserva espaço pro rodapé (Total + Assinatura, agora numa única linha) antes de estourar o quadrante.
+    limite_y = y + pad + 18
+    c.setFont("Helvetica", 10)
+    for qtd, desc, v_unid, v_total in _montar_linhas_tabela(dados):
         if cursor - row_h < limite_y:
             break
-        c.drawString(col_x[0] + 2, cursor - 7, qtd)
-        c.drawString(col_x[1] + 2, cursor - 7, unid)
-        c.drawString(col_x[2] + 2, cursor - 7, desc[:34])
-        c.drawRightString(col_x[4], cursor - 7, _fmt_moeda(v_unid))
-        c.drawRightString(col_x[4] + col_w[4] - 2, cursor - 7, _fmt_moeda(v_total))
+        c.drawString(col_x[0] + 3, cursor - 12, qtd)
+        c.drawString(col_x[1] + 3, cursor - 12, desc[:40])
+        c.drawRightString(col_x[3] - 2, cursor - 12, _fmt_moeda(v_unid))
+        c.drawRightString(col_x[3] + col_w[3] - 3, cursor - 12, _fmt_moeda(v_total))
+        cursor -= row_h
+        c.line(inner_x, cursor, inner_x + inner_w, cursor)
+
+    # Preenche o restante da tabela com linhas em branco até chegar perto do rodapé,
+    # igual ao talão de papel (que tem a grade toda pré-impressa).
+    while cursor - row_h >= limite_y:
         cursor -= row_h
         c.line(inner_x, cursor, inner_x + inner_w, cursor)
 
@@ -222,10 +218,10 @@ def _desenhar_comanda(c: canvas.Canvas, x: float, y: float, dados: dict) -> None
 
     # --- Total + Assinatura ---
     rodape_y = y + pad
-    c.setFont("Helvetica-Bold", 8.5)
-    c.drawRightString(inner_x + inner_w, rodape_y + 14, f"Total R$ {_fmt_moeda(dados['total'])}")
-    c.setFont("Helvetica", 6.5)
-    c.drawString(inner_x, rodape_y, "Ass: ______________________________")
+    c.setFont("Helvetica", 10)
+    c.drawString(inner_x, rodape_y, "Ass: ________________________")
+    c.setFont("Helvetica-Bold", 13)
+    c.drawRightString(inner_x + inner_w, rodape_y, f"Total R$ {_fmt_moeda(dados['total'])}")
 
 
 _QUADRANTES = [
@@ -237,13 +233,9 @@ _QUADRANTES = [
 
 
 def _montar_dados_impressao(item: ComandaImpressao) -> dict:
-    """Combina os dados da comanda com o número do pedido, data e endereço do cliente."""
+    """Combina os dados da comanda com a data de impressão."""
     dados = whatsapp_service.montar_dados_comanda(item.pacote)
-    cliente = item.pacote.cachorro.cliente if item.pacote.cachorro else None
-    hoje = datetime.now()
-    dados["numero"] = item.pacote_id
-    dados["endereco"] = cliente.endereco if cliente else None
-    dados["data_fmt"] = f"{hoje.day:02d} de {_MESES_ABREV_GENITIVO[hoje.month - 1]} de {hoje.year}"
+    dados["data_fmt"] = datetime.now().strftime("%d/%m/%Y")
     return dados
 
 
@@ -289,9 +281,7 @@ def _dados_exemplo() -> dict:
         "transporte": transporte,
         "total": total,
         "status_label": "Fechado",
-        "numero": "0000",
-        "endereco": "Rua Exemplo, 123 - Centro",
-        "data_fmt": f"{hoje.day:02d} de {_MESES_ABREV_GENITIVO[hoje.month - 1]} de {hoje.year}",
+        "data_fmt": hoje.strftime("%d/%m/%Y"),
     }
 
 

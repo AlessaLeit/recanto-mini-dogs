@@ -2,20 +2,20 @@
   <div id="app">
     <nav class="navbar">
       <div class="nav-brand">
-        <span class="nav-brand-icon">🐾</span>
+        <img :src="logo" alt="Logo Canil Recanto Mini Dogs" class="nav-brand-icon" />
         <div class="nav-brand-text">
           <span class="nav-brand-nome">Recanto Mini Dogs</span>
           <span class="nav-brand-sub">Canil · Banho &amp; Tosa</span>
         </div>
       </div>
       <ul class="nav-links">
-        <li><router-link to="/">🏠 Dashboard</router-link></li>
-        <li><router-link to="/pacotes">📦 Pacotes</router-link></li>
-        <li><router-link to="/banhos-avulsos">🛁 Banhos Avulsos</router-link></li>
-        <li><router-link to="/clientes">👥 Clientes</router-link></li>
-        <li><router-link to="/relatorios">📊 Relatórios</router-link></li>
-        <li><router-link to="/whatsapp">💬 WhatsApp</router-link></li>
-        <li><router-link to="/comandas-impressao">🖨️ Comandas</router-link></li>
+        <li><router-link to="/">Agenda</router-link></li>
+        <li><router-link to="/pacotes">Pacotes</router-link></li>
+        <li><router-link to="/banhos-avulsos">Banhos Avulsos</router-link></li>
+        <li><router-link to="/clientes">Clientes</router-link></li>
+        <li><router-link to="/relatorios">Relatórios</router-link></li>
+        <li><router-link to="/whatsapp">WhatsApp</router-link></li>
+        <li><router-link to="/comandas-impressao">Comandas</router-link></li>
       </ul>
     </nav>
 
@@ -27,6 +27,7 @@
 
 <script setup>
 // Componente raiz - layout principal com navegação
+import logo from './assets/logo.jpg'
 </script>
 
 <style>
@@ -92,14 +93,11 @@ body {
 }
 
 .nav-brand-icon {
-  font-size: 1.6rem;
   width: 42px;
   height: 42px;
+  object-fit: cover;
   background: var(--dourado);
   border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
