@@ -1,7 +1,7 @@
 <template>
   <div class="avulsos-view">
     <div class="page-header">
-      <h1 class="page-title">🛁 Banhos Avulsos</h1>
+      <h1 class="page-title">Banhos Avulsos</h1>
     </div>
 
     <div class="form-card">
@@ -22,8 +22,8 @@
         <div class="form-group">
           <label for="av-turno">Turno</label>
           <select id="av-turno" v-model="form.turno">
-            <option value="manha">🌅 Manhã</option>
-            <option value="tarde">🌇 Tarde</option>
+            <option value="manha">Manhã</option>
+            <option value="tarde">Tarde</option>
           </select>
         </div>
         <div class="form-group">

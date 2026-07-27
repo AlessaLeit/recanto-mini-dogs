@@ -69,7 +69,7 @@
           <div v-else class="agendamentos-list">
             <template v-for="entry in agendamentosExibicao" :key="entry.tipo === 'divider' ? `divider-${entry.turno}` : entry.ag.id">
               <div v-if="entry.tipo === 'divider'" class="turno-divider">
-                <span>{{ entry.turno === 'tarde' ? '🌇 Tarde' : '🌅 Manhã' }}</span>
+                <span>{{ entry.turno === 'tarde' ? 'Tarde' : 'Manhã' }}</span>
               </div>
               <div
                 v-else
@@ -131,8 +131,8 @@
         <div class="form-group">
           <label for="edit-turno">Turno</label>
           <select id="edit-turno" v-model="agEdit.turno">
-            <option value="manha">🌅 Manhã</option>
-            <option value="tarde">🌇 Tarde</option>
+            <option value="manha">Manhã</option>
+            <option value="tarde">Tarde</option>
           </select>
         </div>
         <div class="form-group">
