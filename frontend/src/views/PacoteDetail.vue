@@ -96,12 +96,23 @@
           <tr v-for="ag in agendamentos" :key="ag.id" :class="ag.status_presenca">
             <td><strong>{{ formatarData(ag.data_banho) }}</strong></td>
             <td :class="{ 'clickable-cell': !pacote?.fechado }" @click="!pacote?.fechado && abrirEditarExtras(ag)">
-              <span class="status-badge" :class="ag.status_presenca">
+              <!-- Pacote multi-cachorro: mostra o status de cada pet do dia -->
+              <template v-if="qtdCachorros > 1">
+                <span
+                  v-for="cachorro in cachorrosDoPacote"
+                  :key="cachorro.id"
+                  class="status-badge status-badge-pet"
+                  :class="statusDoCachorro(ag, cachorro.id)"
+                >
+                  {{ cachorro.nome }}: {{ statusDoCachorro(ag, cachorro.id).toUpperCase() }}
+                </span>
+              </template>
+              <span v-else class="status-badge" :class="ag.status_presenca">
                 {{ ag.status_presenca?.toUpperCase() }}
               </span>
             </td>
             <td :class="{ 'clickable-cell': !pacote?.fechado }" @click="!pacote?.fechado && abrirEditarExtras(ag)">{{ ag.extras?.info || '-' }}</td>
-            <td>R$ {{ formatarValor(valorBanhoEquivalente) }}</td>
+            <td>R$ {{ formatarValor(valorBanhoDia(ag)) }}</td>
             <td :class="{ 'clickable-cell': !pacote?.fechado }" @click="!pacote?.fechado && abrirEditarExtras(ag)">R$ {{ formatarValor(ag.extras?.valor_extra || 0) }}</td>
             <td v-if="!pacote?.fechado">
               <div class="acoes">
@@ -308,13 +319,36 @@
           <h3>Editar Agendamento</h3>
           <p class="modal-sub">✨ {{ pacote?.pet_nome }}</p>
         </div>
-        <div class="form-group">
+        <!-- Pacote com 1 cachorro: um único status para o dia -->
+        <div class="form-group" v-if="qtdCachorros === 1">
           <label for="edit-status">Status de Presença</label>
           <select id="edit-status" v-model="formExtras.status_presenca">
             <option value="pendente">🟡 PENDENTE</option>
             <option value="concluido">🟢 CONCLUÍDO</option>
             <option value="faltou">🔴 FALTOU / CANCELADO</option>
           </select>
+        </div>
+
+        <!-- Pacote multi-cachorro: um status por pet, pois cada um pode
+             faltar individualmente no mesmo dia. -->
+        <div class="form-group" v-else>
+          <label>Status de Presença</label>
+          <div class="presencas-grid">
+            <div class="presenca-pet" v-for="cachorro in cachorrosDoPacote" :key="cachorro.id">
+              <div class="presenca-pet-topo">
+                <span class="presenca-pet-nome">🐶 {{ cachorro.nome }}</span>
+                <span class="presenca-pet-valor">R$ {{ formatarValor(valorDoCachorro(cachorro.id)) }}</span>
+              </div>
+              <select :id="'status-pet-' + cachorro.id" v-model="formExtras.presencas[cachorro.id]">
+                <option value="pendente">🟡 PENDENTE</option>
+                <option value="concluido">🟢 CONCLUÍDO</option>
+                <option value="faltou">🔴 FALTOU / CANCELADO</option>
+              </select>
+            </div>
+          </div>
+          <small class="helper-text">
+            Banho do dia: R$ {{ formatarValor(valorBanhoFormExtras) }} — só os pets concluídos são cobrados.
+          </small>
         </div>
         <div class="form-group">
           <label for="edit-info">Itens Extra / Descrição</label>
@@ -460,7 +494,9 @@ const agRemovendo = ref(null)
 const pagamentoEditando = ref(null)
 const pagamentoRemovendo = ref(null)
 const agExtras = ref(null)
-const formExtras = ref({ info: '', valor_extra: 0, status_presenca: 'pendente' })
+// presencas: status por cachorro (id -> pendente/concluido/faltou) usado em
+// pacotes multi-cachorro, onde um pet pode faltar e o outro não no mesmo dia.
+const formExtras = ref({ info: '', valor_extra: 0, status_presenca: 'pendente', presencas: {} })
 const formPacote = ref({ tipo_plano: '', dia_da_semana: '', valor_banho_base: 0, valor_cobrado: 0, valor_transporte: 0 });
 // Valor do banho por cachorro adicional (pacotes multi-cachorro), keyed por id do cachorro.
 const formValoresCachorros = reactive({})
@@ -482,6 +518,38 @@ const qtdCachorros = computed(() => pacote.value?.cachorros?.length || 1)
 
 const valorBanhoEquivalente = computed(() => pacote.value?.valor_banho_equivalente ?? (pacote.value?.valor_banho_base || 0))
 
+const cachorrosDoPacote = computed(() => pacote.value?.cachorros || [])
+
+// Valor do banho de cada cachorro (id -> valor), vindo do backend.
+function valorDoCachorro(cachorroId) {
+  const mapa = pacote.value?.valor_banho_por_cachorro || {}
+  const valor = mapa[String(cachorroId)]
+  return typeof valor === 'number' ? valor : (pacote.value?.valor_banho_base || 0)
+}
+
+// Status de um pet num agendamento: usa o status individual quando existe,
+// senão cai no status geral do dia (agendamentos antigos e pacotes de 1 pet).
+function statusDoCachorro(ag, cachorroId) {
+  return ag?.presencas?.[String(cachorroId)] || ag?.status_presenca || 'pendente'
+}
+
+// Valor de banho cobrado no dia: soma só os pets que realmente tomaram banho.
+function valorBanhoDia(ag) {
+  if (qtdCachorros.value === 1) {
+    return ag?.status_presenca === 'concluido' ? valorBanhoEquivalente.value : 0
+  }
+  return cachorrosDoPacote.value.reduce((soma, c) => (
+    statusDoCachorro(ag, c.id) === 'concluido' ? soma + valorDoCachorro(c.id) : soma
+  ), 0)
+}
+
+// Prévia do valor do dia enquanto o usuário edita as presenças no modal.
+const valorBanhoFormExtras = computed(() =>
+  cachorrosDoPacote.value.reduce((soma, c) => (
+    formExtras.value.presencas?.[c.id] === 'concluido' ? soma + valorDoCachorro(c.id) : soma
+  ), 0)
+)
+
 const cachorroPrincipalPacote = computed(() =>
   pacote.value?.cachorros?.find(c => c.id === pacote.value.cachorro_id)
 )
@@ -498,14 +566,13 @@ const todosBanhosResolvidos = computed(() =>
 
 const totalPacote = computed(() => {
   if (!pacote.value) return 0
-  const valorBanho = valorBanhoEquivalente.value
   const transporte = pacote.value.valor_transporte || 0
   const agendamentosTotal = agendamentos.value.reduce((sum, ag) => {
-    const concluido = ag.status_presenca === 'concluido'
-
-    // Regra: só soma banho base e extras quando o agendamento estiver CONCLUÍDO.
-    const valorBanhoSomado = concluido ? valorBanho : 0
-    const valorExtraSomado = concluido ? (ag.extras?.valor_extra || 0) : 0
+    // Regra: só soma o banho dos pets que compareceram (em pacotes com mais de
+    // um cachorro, cada pet conta individualmente) e os extras do dia quando
+    // pelo menos um pet tomou banho.
+    const valorBanhoSomado = valorBanhoDia(ag)
+    const valorExtraSomado = ag.status_presenca === 'concluido' ? (ag.extras?.valor_extra || 0) : 0
 
     return sum + valorBanhoSomado + valorExtraSomado
   }, 0)
@@ -722,16 +789,37 @@ function abrirEditarExtras(ag) {
   agExtras.value = ag
   const info = ag.extras?.info || (typeof ag.extras === 'string' ? ag.extras : '')
   const valor = ag.extras?.valor_extra || 0
-  formExtras.value = { info, valor_extra: valor, status_presenca: ag.status_presenca || 'pendente' }
+
+  // Em pacotes multi-cachorro, cada pet começa com o status individual já
+  // salvo; sem registro individual, herda o status geral do dia.
+  const presencas = {}
+  cachorrosDoPacote.value.forEach(c => {
+    presencas[c.id] = statusDoCachorro(ag, c.id)
+  })
+
+  formExtras.value = {
+    info,
+    valor_extra: valor,
+    status_presenca: ag.status_presenca || 'pendente',
+    presencas
+  }
   showModalExtras.value = true
 }
 
 async function salvarExtras() {
   try {
-    await pacotesStore.updateAgendamento(agExtras.value.id, {
-      status_presenca: formExtras.value.status_presenca,
+    const payload = {
       extras: { info: formExtras.value.info, valor_extra: formExtras.value.valor_extra }
-    })
+    }
+
+    if (qtdCachorros.value > 1) {
+      // O backend deriva o status_presenca do dia a partir das presenças.
+      payload.presencas = { ...formExtras.value.presencas }
+    } else {
+      payload.status_presenca = formExtras.value.status_presenca
+    }
+
+    await pacotesStore.updateAgendamento(agExtras.value.id, payload)
     showModalExtras.value = false
     await carregarPacote()
   } catch (err) {}
@@ -1020,6 +1108,15 @@ onMounted(carregarPacote)
   font-weight: 800;
   letter-spacing: 0.4px;
 }
+/* Badge por pet (pacotes multi-cachorro): uma linha por cachorro */
+.status-badge-pet {
+  display: block;
+  width: fit-content;
+  font-size: 0.68rem;
+  margin-bottom: 3px;
+}
+.status-badge-pet:last-child { margin-bottom: 0; }
+
 .status-badge.pendente  { background: var(--dourado-claro); color: #6b4c00; }
 .status-badge.concluido { background: var(--verde-bg);      color: var(--verde); }
 .status-badge.faltou    { background: #fdeaea;              color: #b94040; }
@@ -1238,6 +1335,41 @@ onMounted(carregarPacote)
   font-size: 1.05rem;
   color: var(--marrom);
 }
+
+/* ── PRESENÇA POR PET (pacotes multi-cachorro) ── */
+.presencas-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.presenca-pet {
+  background: var(--creme);
+  border: 2px solid var(--creme-escuro);
+  border-radius: 8px;
+  padding: 0.7rem 0.8rem;
+}
+
+.presenca-pet-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.45rem;
+}
+
+.presenca-pet-nome {
+  font-weight: 800;
+  font-size: 0.88rem;
+  color: var(--marrom);
+}
+
+.presenca-pet-valor {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.presenca-pet select { background: var(--white); }
 
 .helper-text {
   color: var(--text-muted);

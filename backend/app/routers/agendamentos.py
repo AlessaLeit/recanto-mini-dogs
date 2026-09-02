@@ -154,8 +154,26 @@ def atualizar_agendamento(
     _bloquear_se_pacote_fechado(db_ag)
 
     update_dict = update_data.model_dump(exclude_unset=True)
+
+    # presencas é aplicado por último: grava o status individual de cada
+    # cachorro dentro de extras e recalcula o status_presenca do dia.
+    presencas = update_dict.pop("presencas", None)
+
+    # Um extras enviado sem a chave "presencas" (payload antigo do formulário de
+    # itens extras) não pode apagar o status individual já registrado.
+    if presencas is None and isinstance(update_dict.get("extras"), dict):
+        if "presencas" not in update_dict["extras"] and db_ag.presencas:
+            update_dict["extras"] = {**update_dict["extras"], "presencas": db_ag.presencas}
+
     for field, value in update_dict.items():
         setattr(db_ag, field, value)
+
+    if presencas is not None:
+        db_ag.definir_presencas(presencas)
+    elif "status_presenca" in update_dict and db_ag.presencas:
+        # Status definido para o dia inteiro (ex.: pela agenda do dashboard):
+        # aplica o mesmo status a todos os pets do pacote.
+        db_ag.definir_presencas({cid: update_dict["status_presenca"] for cid in db_ag.presencas})
 
     db.commit()
     db.refresh(db_ag)
@@ -163,7 +181,7 @@ def atualizar_agendamento(
     # Se o status de presença mudou, verifica se todos os agendamentos do
     # pacote já foram resolvidos (nenhum mais pendente) — se sim, fecha o
     # ciclo automaticamente e envia a comanda por WhatsApp, se configurado.
-    if "status_presenca" in update_dict and db_ag.pacote_id is not None:
+    if ("status_presenca" in update_dict or presencas is not None) and db_ag.pacote_id is not None:
         PacoteService(db).fechar_se_completo(db_ag.pacote_id)
 
     return AgendamentoResponse.model_validate(db_ag).model_dump()

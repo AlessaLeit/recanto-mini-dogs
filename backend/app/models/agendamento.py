@@ -81,6 +81,76 @@ class Agendamento(Base):
     # Relacionamentos
     pacote: Mapped[Optional["Pacote"]] = relationship(back_populates="agendamentos")
 
+    # ── Presença por cachorro (pacotes multi-cachorro) ──────────────────────
+    # Em pacotes com mais de um cachorro, cada pet pode ter comparecido ou não
+    # no mesmo dia. O status individual fica em extras["presencas"], no formato
+    # {"<cachorro_id>": "pendente|concluido|faltou"}, e status_presenca guarda
+    # o resumo do dia (usado por dashboard, relatórios e fechamento do ciclo).
+
+    @property
+    def presencas(self) -> Dict[str, str]:
+        """Status individual por cachorro; vazio em agendamentos de pet único."""
+        return (self.extras or {}).get("presencas") or {}
+
+    def presenca_do_cachorro(self, cachorro_id: int) -> str:
+        """
+        Status de um cachorro específico. Sem registro individual (agendamentos
+        antigos ou pacotes de um pet só), vale o status geral do dia.
+        """
+        individual = self.presencas.get(str(cachorro_id))
+        if individual:
+            return individual
+        return self.status_presenca.value if self.status_presenca else StatusPresenca.PENDENTE.value
+
+    def definir_presencas(self, presencas: Dict[str, str]) -> None:
+        """
+        Grava o status individual dos cachorros em extras e recalcula o status
+        geral do dia: pendente se algum pet ainda está pendente, concluído se ao
+        menos um tomou banho, faltou se nenhum compareceu.
+        """
+        extras = dict(self.extras or {})
+        limpas = {str(k): v for k, v in (presencas or {}).items() if v}
+        if limpas:
+            extras["presencas"] = limpas
+        else:
+            extras.pop("presencas", None)
+        self.extras = extras
+
+        valores = list(limpas.values())
+        if not valores:
+            return
+        if StatusPresenca.PENDENTE.value in valores:
+            self.status_presenca = StatusPresenca.PENDENTE
+        elif StatusPresenca.CONCLUIDO.value in valores:
+            self.status_presenca = StatusPresenca.CONCLUIDO
+        else:
+            self.status_presenca = StatusPresenca.FALTOU
+
+    @property
+    def valor_banho_dia(self) -> float:
+        """
+        Valor de banho cobrado neste dia: soma apenas os cachorros que de fato
+        tomaram banho. Em pacotes de um pet só (ou agendamentos sem presença
+        individual), equivale ao valor do dia inteiro quando concluído.
+        """
+        if not self.pacote:
+            return 0.0
+        valores = self.pacote.valor_banho_por_cachorro
+        return sum(
+            valor for cachorro_id, valor in valores.items()
+            if self.presenca_do_cachorro(int(cachorro_id)) == StatusPresenca.CONCLUIDO.value
+        )
+
+    @property
+    def cachorros_presentes(self) -> list:
+        """Nomes dos cachorros que tomaram banho neste dia (para comandas)."""
+        if not self.pacote:
+            return []
+        return [
+            c.nome for c in self.pacote.cachorros_todos
+            if self.presenca_do_cachorro(c.id) == StatusPresenca.CONCLUIDO.value
+        ]
+
     def to_dict(self) -> dict:
         """Serialização completa para JSON/API"""
         return {
@@ -90,6 +160,8 @@ class Agendamento(Base):
             "status_presenca": self.status_presenca.value if self.status_presenca else None,
             "turno": self.turno.value if self.turno else None,
             "extras": self.extras or {},
+            "presencas": self.presencas,
+            "valor_banho_dia": self.valor_banho_dia,
             "pet_nome_avulso": self.pet_nome_avulso,
             "cliente_nome_avulso": self.cliente_nome_avulso,
             "valor_avulso": self.valor_avulso,

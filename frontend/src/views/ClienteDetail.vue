@@ -43,7 +43,7 @@
               :class="ag.status_presenca"
             >
               <span class="data-data">{{ formatarData(ag.data_banho) }}</span>
-              <span class="data-valor">R$ {{ formatarValor(bloco.valorBanhoEquivalente) }}</span>
+              <span class="data-valor">R$ {{ formatarValor(ag.valor_banho_dia ?? bloco.valorBanhoEquivalente) }}</span>
               <span v-if="ag.extras?.info" class="data-extra">{{ ag.extras.info }}</span>
               <span v-if="ag.extras?.valor_extra > 0" class="data-extra-valor">R$ {{ formatarValor(ag.extras.valor_extra) }}</span>
             </div>
@@ -169,14 +169,16 @@ const blocos = computed(() => {
     const primeiraData = agendamentosOrdenados[0]?.data_banho
     const dataRef = primeiraData ? new Date(primeiraData + 'T00:00:00') : new Date(pacote.criado_em)
 
-    // Pacotes com mais de um cachorro banham juntos no mesmo dia, então o valor
-    // do dia equivale ao valor base multiplicado pela quantidade de cachorros.
-    const qtdCachorros = pacote.cachorros?.length || 1
-    const valorBanhoEquivalente = (pacote.valor_banho_base || 0) * qtdCachorros
+    // Pacotes com mais de um cachorro banham juntos no mesmo dia, mas cada pet
+    // pode faltar individualmente — o backend já calcula em valor_banho_dia o
+    // valor de cada data considerando só quem tomou banho.
+    const valorBanhoEquivalente = pacote.valor_banho_equivalente
+      ?? (pacote.valor_banho_base || 0) * (pacote.cachorros?.length || 1)
 
     const totalConcluidos = agendamentosOrdenados.reduce((sum, ag) => {
       if (ag.status_presenca !== 'concluido') return sum
-      return sum + valorBanhoEquivalente + (ag.extras?.valor_extra || 0)
+      const valorBanho = ag.valor_banho_dia ?? valorBanhoEquivalente
+      return sum + valorBanho + (ag.extras?.valor_extra || 0)
     }, 0)
     const total = totalConcluidos + (pacote.valor_transporte || 0)
 

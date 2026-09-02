@@ -198,6 +198,25 @@ class Pacote(Base):
         return total
 
     @property
+    def valor_banho_por_cachorro(self) -> Dict[str, float]:
+        """
+        Valor do banho de cada cachorro do pacote (chave = id em string). O
+        principal usa valor_banho_base; os adicionais usam o valor customizado
+        em valores_cachorros ou valor_banho_base como padrão.
+        """
+        base = self.valor_banho_base or 0.0
+        valores = self.valores_cachorros or {}
+        principal_id = self.cachorro.id if self.cachorro else None
+        resultado: Dict[str, float] = {}
+        for c in self.cachorros_todos:
+            if c.id == principal_id:
+                resultado[str(c.id)] = base
+            else:
+                valor_custom = valores.get(str(c.id))
+                resultado[str(c.id)] = valor_custom if valor_custom is not None else base
+        return resultado
+
+    @property
     def pet_nome(self) -> Optional[str]:
         """Retorna o(s) nome(s) do(s) pet(s) vinculado(s), separados por vírgula"""
         nomes = [c.nome for c in self.cachorros_todos if c and c.nome]
@@ -231,6 +250,7 @@ class Pacote(Base):
             "valor_transporte": self.valor_transporte,
             "valores_cachorros": self.valores_cachorros or {},
             "valor_banho_equivalente": self.valor_banho_equivalente,
+            "valor_banho_por_cachorro": self.valor_banho_por_cachorro,
             "valor_pago": self.valor_pago_total, # Mantém compatibilidade com UI que espera 'valor_pago'
             "fechado": self.fechado,
             "ativo": self.ativo,

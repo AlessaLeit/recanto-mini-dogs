@@ -120,6 +120,7 @@ class PacoteResponse(BaseModel):
     valor_transporte: float = 0.0
     valores_cachorros: Dict[str, float] = Field(default_factory=dict)
     valor_banho_equivalente: float = 0.0
+    valor_banho_por_cachorro: Dict[str, float] = Field(default_factory=dict)
     valor_pago: float = 0.0
     pagamentos: List[PagamentoResponse] = []
     ativo: bool

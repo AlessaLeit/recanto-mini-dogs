@@ -156,14 +156,23 @@ def montar_dados_comanda(pacote) -> Dict[str, Any]:
         primeira_data = agendamentos_concluidos[0].data_banho
         mes_label = f"{_MESES[primeira_data.month - 1]}/{primeira_data.year}"
 
+    # Em pacotes multi-cachorro cada pet pode ter faltado individualmente, então
+    # o valor do dia vem de valor_banho_dia (só os pets que tomaram banho).
+    total_cachorros = len(pacote.cachorros_todos)
+
     linhas_banhos = []
     for ag in agendamentos_concluidos:
         valor_extra = (ag.extras or {}).get("valor_extra", 0) or 0
+        presentes = ag.cachorros_presentes
         linhas_banhos.append({
             "data": ag.data_banho,
-            "valor": pacote.valor_banho_equivalente,
+            "valor": ag.valor_banho_dia,
             "extra_info": (ag.extras or {}).get("info") if valor_extra else None,
             "extra_valor": valor_extra,
+            # Só descreve quais pets vieram quando o pacote tem mais de um e
+            # nem todos tomaram banho nesse dia.
+            "pets": presentes if total_cachorros > 1 and len(presentes) < total_cachorros else [],
+            "qtd_pets": len(presentes) if total_cachorros > 1 else 1,
         })
 
     return {
@@ -196,6 +205,8 @@ def formatar_comanda_mensagem(pacote) -> str:
         for banho in dados["banhos"]:
             data_fmt = banho["data"].strftime("%d/%m/%Y")
             linha = f"{data_fmt} — R$ {banho['valor']:.2f}".replace(".", ",")
+            if banho["pets"]:
+                linha += f" ({', '.join(banho['pets'])})"
             if banho["extra_valor"]:
                 linha += f" + {banho['extra_info'] or 'extra'} R$ {banho['extra_valor']:.2f}".replace(".", ",")
             linhas.append(linha)

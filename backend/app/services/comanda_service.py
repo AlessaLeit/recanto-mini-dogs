@@ -96,7 +96,13 @@ def _montar_linhas_tabela(dados: dict) -> List[tuple]:
     linhas = []
     for banho in dados["banhos"]:
         data_fmt = banho["data"].strftime("%d/%m")
-        linhas.append(("1", f"Banho - {data_fmt}", banho["valor"], banho["valor"]))
+        qtd = banho.get("qtd_pets") or 1
+        desc = f"Banho - {data_fmt}"
+        # Pacote multi-cachorro em que só parte dos pets tomou banho: nomeia quem veio.
+        if banho.get("pets"):
+            desc += f" ({', '.join(banho['pets'])})"
+        # V.Unid. é o valor por pet do dia; o total da linha soma todos os pets.
+        linhas.append((str(qtd), desc, banho["valor"] / qtd if qtd else banho["valor"], banho["valor"]))
         if banho["extra_valor"]:
             desc = banho["extra_info"] or "Item extra"
             linhas.append(("1", f"{desc} - {data_fmt}", banho["extra_valor"], banho["extra_valor"]))

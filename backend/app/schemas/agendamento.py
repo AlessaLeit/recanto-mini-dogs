@@ -73,11 +73,17 @@ class AgendamentoUpdate(BaseModel):
     turno: Optional[Literal["manha", "tarde"]] = None
     extras: Optional[Dict[str, Any]] = None
     pago_avulso: Optional[bool] = None
+    presencas: Optional[Dict[str, Literal["pendente", "concluido", "faltou"]]] = Field(
+        default=None,
+        description="Status por cachorro (id -> status) em pacotes multi-cachorro; "
+                    "define automaticamente o status_presenca do dia"
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "status_presenca": "faltou",
+                "presencas": {"3": "concluido", "7": "faltou"},
                 "extras": {"motivo": "cliente avisou"}
             }
         }
@@ -91,6 +97,8 @@ class AgendamentoResponse(AgendamentoBase):
     cliente_nome_avulso: Optional[str] = None
     valor_avulso: Optional[float] = None
     pago_avulso: bool = False
+    presencas: Dict[str, str] = Field(default_factory=dict)
+    valor_banho_dia: float = 0.0
     registrado_em: datetime
     atualizado_em: Optional[datetime] = None
 
