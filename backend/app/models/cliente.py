@@ -19,8 +19,13 @@ class Cliente(Base):
     nome: Mapped[str] = mapped_column(String(100), nullable=False)
     
     # Campos opcionais
-    telefone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     endereco: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # WhatsApp - único contato telefônico do cliente (substituiu o campo telefone)
+    whatsapp: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    # Como a comanda (pacote fechado) é entregue ao cliente: 'whatsapp' ou 'impresso'
+    envio_comanda: Mapped[str] = mapped_column(String(20), default="impresso", server_default="impresso", nullable=False)
     
     # Timestamps
     criado_em: Mapped[datetime] = mapped_column(

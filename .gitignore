@@ -1,23 +1,31 @@
-__pycache__/
-*.py[cod]
-*$py.class
-.venv/
-venv/
-ENV/
-env/
+# Arquivos de configuração de ambiente e segredos
 .env
+# Arquivos de configuração do Kubernetes que não devem ser versionados
+secret.yaml
+ingress.yaml
+configmap.yaml
 
+# Python / Backend
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node.js / Frontend
 node_modules/
-dist/
+/frontend/dist/
+npm-debug.log*
+
+# Arquivos de Sistema Operacional e Editor
 .DS_Store
+.vscode/
+
+# Test coverage (pytest/coverage)
+htmlcov/
+*.coverage
+.coverage
+test/.coverage
 
 *.db
 *.sqlite3
-
-# Testes e Cobertura
-.coverage
-htmlcov/
-
-# Configurações sensíveis de infra
-k8s/secret.yaml
-k8s/ingress.yaml

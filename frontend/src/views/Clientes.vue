@@ -22,10 +22,13 @@
       <div v-for="cliente in clientesFiltrados" :key="cliente.id" class="cliente-card">
         <div class="cliente-header">
           <div>
-            <h3 class="cliente-nome">{{ cliente.nome }}</h3>
+            <h3 class="cliente-nome cliente-nome-link" @click="verDetalhesCliente(cliente)" title="Ver pacotes deste cliente">{{ cliente.nome }}</h3>
             <div class="cliente-info">
-              <span v-if="cliente.telefone">📞 {{ cliente.telefone }}</span>
+              <span v-if="cliente.whatsapp">💬 {{ cliente.whatsapp }}</span>
               <span v-if="cliente.endereco">📍 {{ cliente.endereco }}</span>
+              <span class="comanda-badge" :class="cliente.envio_comanda">
+                {{ cliente.envio_comanda === 'whatsapp' ? '💬 Comanda por WhatsApp' : '🖨️ Comanda impressa' }}
+              </span>
             </div>
           </div>
           <div class="cliente-actions">
@@ -67,12 +70,19 @@
             <input id="cliente-nome" v-model="formCliente.nome" required />
           </div>
           <div class="form-group">
-            <label for="cliente-telefone">Telefone</label>
-            <input id="cliente-telefone" v-model="formCliente.telefone" />
+            <label for="cliente-whatsapp">WhatsApp</label>
+            <input id="cliente-whatsapp" v-model="formCliente.whatsapp" placeholder="Ex: (11) 98765-4321" />
           </div>
           <div class="form-group">
             <label for="cliente-endereco">Endereço</label>
             <input id="cliente-endereco" v-model="formCliente.endereco" />
+          </div>
+          <div class="form-group">
+            <label for="cliente-envio-comanda">Recebe comanda (pacote fechado) por</label>
+            <select id="cliente-envio-comanda" v-model="formCliente.envio_comanda">
+              <option value="impresso">🖨️ Impresso</option>
+              <option value="whatsapp">💬 WhatsApp</option>
+            </select>
           </div>
           <div class="form-actions">
             <button type="button" @click="showNovoCliente = false" class="btn btn-cancelar">Cancelar</button>
@@ -134,7 +144,7 @@ const editandoDog = ref(false)
 const clienteAtual = ref(null)
 const dogAtual = ref(null)
 
-const formCliente = ref({ nome: '', telefone: '', endereco: '' })
+const formCliente = ref({ nome: '', endereco: '', whatsapp: '', envio_comanda: 'impresso' })
 const formCachorro = ref({ nome: '', raca: '', porte: 'medio', observacoes: '', cliente_id: null })
 
 const clientesFiltrados = computed(() => {
@@ -165,6 +175,9 @@ function editarCachorro(cliente, dog) {
 function verPacotesCachorro(dog) {
   router.push(`/pacotes?cachorro_id=${dog.id}`)
 }
+function verDetalhesCliente(cliente) {
+  router.push(`/clientes/${cliente.id}`)
+}
 async function salvarCliente() {
   try {
     if (editando.value) {
@@ -173,7 +186,7 @@ async function salvarCliente() {
       await clientesStore.criarCliente(formCliente.value)
     }
     showNovoCliente.value = false
-    formCliente.value = { nome: '', telefone: '', endereco: '' }
+    formCliente.value = { nome: '', endereco: '', whatsapp: '', envio_comanda: 'impresso' }
     editando.value = false
   } catch (err) { alert('Erro: ' + err) }
 }
@@ -271,7 +284,14 @@ onMounted(() => { clientesStore.fetchClientes() })
   margin-bottom: 0.6rem;
 }
 .cliente-nome { font-size: 1.1rem; font-weight: 800; color: var(--marrom); margin: 0 0 4px; }
-.cliente-info { display: flex; gap: 1rem; color: var(--text-muted); font-size: 0.88rem; font-weight: 600; }
+.cliente-nome-link { cursor: pointer; transition: color 0.15s; width: fit-content; }
+.cliente-nome-link:hover { color: var(--dourado); text-decoration: underline; }
+.cliente-info { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1rem; color: var(--text-muted); font-size: 0.88rem; font-weight: 600; }
+.comanda-badge {
+  font-size: 0.75rem; font-weight: 800; padding: 0.2rem 0.55rem; border-radius: 999px;
+  background: var(--creme-escuro); color: var(--text-muted);
+}
+.comanda-badge.whatsapp { background: #dcf3e3; color: #2e7d4f; }
 .cliente-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
 
 /* PETS */

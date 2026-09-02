@@ -5,7 +5,7 @@ Configura CORS, lifespan e registra todos os routers.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from app.database import engine, Base
+from app.database import engine, Base, ensure_schema_upgrades
 from app.routers import api_router
 from app.routers import auth
 
@@ -19,6 +19,8 @@ async def lifespan(app: FastAPI):
     try:
         # Startup: cria tabelas se não existirem
         Base.metadata.create_all(bind=engine)
+        # Adiciona colunas novas em tabelas já existentes (sem Alembic em produção)
+        ensure_schema_upgrades()
         print("✅ Tabelas verificadas/criadas com sucesso.")
     except Exception as e:
         print(f"❌ Erro ao conectar no banco de dados: {e}")

@@ -1,199 +1,281 @@
 /**
  * Store Pinia para gerenciamento de estado de Pacotes.
  */
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import pacoteApi from '../api/pacotes.js'
+import { defineStore } from "pinia";
+import { ref, computed } from "vue";
+import pacoteApi from "../api/pacotes.js";
 
-export const usePacotesStore = defineStore('pacotes', () => {
-  const pacotes = ref([])
-  const pacoteAtual = ref(null)
-  const loading = ref(false)
-  const erro = ref(null)
+export const usePacotesStore = defineStore("pacotes", () => {
+  const pacotes = ref([]);
+  const pacoteAtual = ref(null);
+  const loading = ref(false);
+  const erro = ref(null);
 
-  const totalPacotes = computed(() => pacotes.value.length)
+  const totalPacotes = computed(() => pacotes.value.length);
   // Filtra apenas os ativos. Consideramos p.ativo !== false para aceitar registros onde o campo seja null
-  const pacotesAtivos = computed(() => pacotes.value.filter(p => p.ativo !== false))
-  const pacotesAbertos = computed(() => pacotesAtivos.value.filter(p => p.status_pagamento === 'em_aberto'))
-  
+  const pacotesAtivos = computed(() =>
+    pacotes.value.filter((p) => p.ativo !== false),
+  );
+  const pacotesAbertos = computed(() =>
+    pacotesAtivos.value.filter((p) => p.status_pagamento === "em_aberto"),
+  );
+
   // Receita prevista usa apenas pacotes ativos e não multiplica mais, pois valor_cobrado já é o total
-  const totalReceitaPrevista = computed(() => pacotesAtivos.value.reduce((sum, p) => sum + (Number(p.valor_cobrado) || 0), 0))
+  const totalReceitaPrevista = computed(() =>
+    pacotesAtivos.value.reduce(
+      (sum, p) => sum + (Number(p.valor_cobrado) || 0),
+      0,
+    ),
+  );
 
   async function fetchPacotes(params = {}) {
-    loading.value = true
-    erro.value = null
+    loading.value = true;
+    erro.value = null;
     try {
-      const response = await pacoteApi.listar(params)
+      const response = await pacoteApi.listar(params);
 
-  pacotes.value = Array.isArray(response.data) ? response.data : []
-
+      pacotes.value = Array.isArray(response.data) ? response.data : [];
     } catch (err) {
-      erro.value = err.response?.data?.detail || 'Erro ao carregar pacotes'
-      console.error(erro.value)
+      erro.value = err.response?.data?.detail || "Erro ao carregar pacotes";
+      console.error(erro.value);
     } finally {
-      loading.value = false
+      loading.value = false;
     }
   }
 
   async function fetchPacote(id) {
-    loading.value = true
+    loading.value = true;
     try {
       // ✅ NOVO: Usa endpoint otimizado /pacotes/{id}/detalhes-com-agendamentos
-      const response = await pacoteApi.detalhesComAgendamentos(id)
-      pacoteAtual.value = response.data
-      return pacoteAtual.value
+      const response = await pacoteApi.detalhesComAgendamentos(id);
+      pacoteAtual.value = response.data;
+      return pacoteAtual.value;
     } catch (err) {
-      erro.value = err.response?.data?.detail || 'Erro ao carregar pacote'
-      console.error(erro.value)
-      throw err
+      erro.value = err.response?.data?.detail || "Erro ao carregar pacote";
+      console.error(erro.value);
+      throw err;
     } finally {
-      loading.value = false
+      loading.value = false;
     }
   }
 
   async function criarPacote(data) {
     try {
-      const response = await pacoteApi.criar(data)
-      pacotes.value.unshift(response.data)
-      return response.data
+      const response = await pacoteApi.criar(data);
+      pacotes.value.unshift(response.data);
+      return response.data;
     } catch (err) {
-      console.error(err.response?.data?.detail || 'Erro ao criar pacote')
-      throw err
+      console.error(err.response?.data?.detail || "Erro ao criar pacote");
+      throw err;
     }
   }
 
   async function atualizarPacote(id, data) {
     try {
-      const response = await pacoteApi.atualizar(id, data)
-      const index = pacotes.value.findIndex(p => p.id === id)
+      const response = await pacoteApi.atualizar(id, data);
+      const index = pacotes.value.findIndex((p) => p.id === id);
       if (index !== -1) {
-        pacotes.value[index] = response.data
+        pacotes.value[index] = response.data;
       }
       if (pacoteAtual.value?.id === id) {
-        pacoteAtual.value = response.data
+        pacoteAtual.value = response.data;
       }
-      return response.data
+      return response.data;
     } catch (err) {
-      console.error(err.response?.data?.detail || 'Erro ao atualizar pacote')
-      throw err
+      console.error(err.response?.data?.detail || "Erro ao atualizar pacote");
+      throw err;
     }
   }
 
   async function deletarPacote(id) {
     try {
-      await pacoteApi.deletar(id)
-      pacotes.value = pacotes.value.filter(p => p.id !== id)
+      await pacoteApi.deletar(id);
+      pacotes.value = pacotes.value.filter((p) => p.id !== id);
       if (pacoteAtual.value?.id === id) {
-        pacoteAtual.value = null
+        pacoteAtual.value = null;
       }
     } catch (err) {
-      console.error(err.response?.data?.detail || 'Erro ao deletar pacote')
-      throw err
+      console.error(err.response?.data?.detail || "Erro ao deletar pacote");
+      throw err;
     }
   }
 
-  async function registrarPagamento(id, valor_pago, data_pagamento) {
+  async function registrarPagamento(id, dados) {
     try {
-      await pacoteApi.registrarPagamento(id, valor_pago, data_pagamento)
-      await fetchPacotes()
-      await fetchPacote(id)  // Refresh current
+      await pacoteApi.registrarPagamento(id, dados);
+      await fetchPacotes();
+      await fetchPacote(id); // Refresh current
     } catch (err) {
-      console.error(err.response?.data?.detail || 'Erro ao registrar pagamento')
-      throw err
+      console.error(
+        err.response?.data?.detail || "Erro ao registrar pagamento",
+      );
+      throw err;
+    }
+  }
+
+  async function atualizarPagamento(pacoteId, pagamentoId, dados) {
+    try {
+      await pacoteApi.atualizarPagamento(pacoteId, pagamentoId, dados);
+      await fetchPacotes();
+      await fetchPacote(pacoteId);
+    } catch (err) {
+      console.error(
+        err.response?.data?.detail || "Erro ao atualizar pagamento",
+      );
+      throw err;
+    }
+  }
+
+  async function deletarPagamento(pacoteId, pagamentoId) {
+    try {
+      await pacoteApi.deletarPagamento(pacoteId, pagamentoId);
+      await fetchPacotes();
+      await fetchPacote(pacoteId);
+    } catch (err) {
+      console.error(err.response?.data?.detail || "Erro ao excluir pagamento");
+      throw err;
     }
   }
 
   async function fecharPacote(id) {
     try {
-      const response = await pacoteApi.fechar(id)
-      const index = pacotes.value.findIndex(p => p.id === id)
+      const response = await pacoteApi.fechar(id);
+      const index = pacotes.value.findIndex((p) => p.id === id);
       if (index !== -1) {
-        pacotes.value[index] = response.data
+        pacotes.value[index] = response.data;
       }
       if (pacoteAtual.value?.id === id) {
-        pacoteAtual.value = response.data
+        pacoteAtual.value = response.data;
       }
-      return response.data
+      return response.data;
     } catch (err) {
-      console.error(err.response?.data?.detail || 'Erro ao fechar pacote')
-      throw err
+      console.error(err.response?.data?.detail || "Erro ao fechar pacote");
+      throw err;
+    }
+  }
+
+  async function reabrirPacote(id) {
+    try {
+      const response = await pacoteApi.reabrir(id);
+      const index = pacotes.value.findIndex((p) => p.id === id);
+      if (index !== -1) {
+        pacotes.value[index] = response.data;
+      }
+      if (pacoteAtual.value?.id === id) {
+        pacoteAtual.value = response.data;
+      }
+      return response.data;
+    } catch (err) {
+      console.error(err.response?.data?.detail || "Erro ao reabrir pacote");
+      throw err;
+    }
+  }
+
+  async function enviarComanda(id) {
+    try {
+      const response = await pacoteApi.enviarComanda(id);
+      return response.data;
+    } catch (err) {
+      console.error(
+        err.response?.data?.detail || "Erro ao enviar comanda por WhatsApp",
+      );
+      throw err;
     }
   }
 
   // ✅ NOVO: Atualizar apenas a data de um agendamento
   async function updateAgendamentoData(id, data_banho) {
     try {
-      const response = await pacoteApi.atualizarDataAgendamento(id, data_banho)
+      const response = await pacoteApi.atualizarDataAgendamento(id, data_banho);
       // Atualiza localmente se pacoteAtual estiver carregado
-      if (pacoteAtual.value?.agendamentos) {
-        const idx = pacoteAtual.value.agendamentos.findIndex(a => a.id === id)
+      if (pacoteAtual.value && pacoteAtual.value.agendamentos) {
+        const idx = pacoteAtual.value.agendamentos.findIndex(
+          (a) => a.id === id,
+        );
         if (idx > -1) {
-          pacoteAtual.value.agendamentos[idx] = { 
-            ...pacoteAtual.value.agendamentos[idx], 
-            data_banho: response.data.data_banho 
-          }
+          pacoteAtual.value.agendamentos[idx] = {
+            ...pacoteAtual.value.agendamentos[idx],
+            data_banho: response.data.data_banho,
+          };
           // Reordena por data
-          pacoteAtual.value.agendamentos.sort((a, b) => 
-            new Date(a.data_banho) - new Date(b.data_banho)
-          )
+          pacoteAtual.value.agendamentos.sort(
+            (a, b) => new Date(a.data_banho) - new Date(b.data_banho),
+          );
         }
       }
-      return response.data
+      return response.data;
     } catch (err) {
-      console.error(err.response?.data?.detail || 'Erro ao atualizar data do agendamento')
-      throw err
+      console.error(
+        err.response?.data?.detail || "Erro ao atualizar data do agendamento",
+      );
+      throw err;
     }
   }
 
   // Remover agendamento
   async function removerAgendamento(id) {
     try {
-      await pacoteApi.deletarAgendamento(id)
+      await pacoteApi.deletarAgendamento(id);
       // Remove localmente
-      if (pacoteAtual.value?.agendamentos) {
-        pacoteAtual.value.agendamentos = pacoteAtual.value.agendamentos.filter(a => a.id !== id)
-        pacoteAtual.value.total_agendamentos = pacoteAtual.value.agendamentos.length
+      if (pacoteAtual.value && pacoteAtual.value.agendamentos) {
+        pacoteAtual.value.agendamentos = pacoteAtual.value.agendamentos.filter(
+          (a) => a.id !== id,
+        );
+        pacoteAtual.value.total_agendamentos =
+          pacoteAtual.value.agendamentos.length;
       }
     } catch (err) {
-      console.error(err.response?.data?.detail || 'Erro ao remover agendamento')
-      throw err
+      console.error(
+        err.response?.data?.detail || "Erro ao remover agendamento",
+      );
+      throw err;
     }
   }
 
   // Adicionar agendamento extra
   async function adicionarExtra(pacoteId, data_banho) {
     try {
-      const response = await pacoteApi.adicionarAgendamentoExtra(pacoteId, data_banho)
+      const response = await pacoteApi.adicionarAgendamentoExtra(
+        pacoteId,
+        data_banho,
+      );
       // Adiciona localmente
-      if (pacoteAtual.value?.agendamentos) {
-        pacoteAtual.value.agendamentos.push(response.data)
+      if (pacoteAtual.value && pacoteAtual.value.agendamentos) {
+        pacoteAtual.value.agendamentos.push(response.data);
         // Reordena por data
-        pacoteAtual.value.agendamentos.sort((a, b) => 
-          new Date(a.data_banho) - new Date(b.data_banho)
-        )
-        pacoteAtual.value.total_agendamentos = pacoteAtual.value.agendamentos.length
+        pacoteAtual.value.agendamentos.sort(
+          (a, b) => new Date(a.data_banho) - new Date(b.data_banho),
+        );
+        pacoteAtual.value.total_agendamentos =
+          pacoteAtual.value.agendamentos.length;
       }
-      return response.data
+      return response.data;
     } catch (err) {
-      console.error(err.response?.data?.detail || 'Erro ao adicionar agendamento extra')
-      throw err
+      console.error(
+        err.response?.data?.detail || "Erro ao adicionar agendamento extra",
+      );
+      throw err;
     }
   }
 
   async function updateAgendamento(id, data) {
     try {
-      const response = await pacoteApi.atualizarAgendamento(id, data)
-      if (pacoteAtual.value?.agendamentos) {
-        const idx = pacoteAtual.value.agendamentos.findIndex(a => a.id === id)
+      const response = await pacoteApi.atualizarAgendamento(id, data);
+      if (pacoteAtual.value && pacoteAtual.value.agendamentos) {
+        const idx = pacoteAtual.value.agendamentos.findIndex(
+          (a) => a.id === id,
+        );
         if (idx > -1) {
           // Update com novos totais se vierem da API
-          pacoteAtual.value.agendamentos[idx] = { ...response.data }
+          pacoteAtual.value.agendamentos[idx] = { ...response.data };
         }
       }
-      return response.data
+      return response.data;
     } catch (err) {
-      console.error(err.response?.data?.detail || 'Erro ao atualizar agendamento')
-      throw err
+      console.error(
+        err.response?.data?.detail || "Erro ao atualizar agendamento",
+      );
+      throw err;
     }
   }
 
@@ -212,10 +294,14 @@ export const usePacotesStore = defineStore('pacotes', () => {
     atualizarPacote,
     deletarPacote,
     fecharPacote,
+    reabrirPacote,
+    enviarComanda,
     registrarPagamento,
+    atualizarPagamento,
+    deletarPagamento,
     updateAgendamento,
     updateAgendamentoData,
     removerAgendamento,
-    adicionarExtra
-  }
-})
+    adicionarExtra,
+  };
+});

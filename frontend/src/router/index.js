@@ -2,67 +2,91 @@
  * Configuração do Vue Router.
  * Define rotas para todas as views da aplicação.
  */
-import { createRouter, createWebHistory } from 'vue-router'
-import Dashboard from '../views/Dashboard.vue'
-import Pacotes from '../views/Pacotes.vue'
-import Clientes from '../views/Clientes.vue'
-import Relatorios from '../views/Relatorios.vue'
-import Login from '../views/Login.vue'
-import PacoteDetail from '../views/PacoteDetail.vue'
+import { createRouter, createWebHistory } from "vue-router";
+import Dashboard from "../views/Dashboard.vue";
+import Pacotes from "../views/Pacotes.vue";
+import Clientes from "../views/Clientes.vue";
+import Relatorios from "../views/Relatorios.vue";
+import Login from "../views/Login.vue";
+import PacoteDetail from "../views/PacoteDetail.vue";
+import BanhosAvulsos from "../views/BanhosAvulsos.vue";
+import ClienteDetail from "../views/ClienteDetail.vue";
+import WhatsAppConfig from "../views/WhatsAppConfig.vue";
+import ComandasImpressao from "../views/ComandasImpressao.vue";
+import { useAuthStore } from "../stores/auth";
 
 const routes = [
   {
-    path: '/',
-    name: 'Dashboard',
-    component: Dashboard
+    path: "/",
+    name: "Dashboard",
+    component: Dashboard,
   },
   {
-    path: '/login',
-    name: 'Login',
+    path: "/login",
+    name: "Login",
     component: Login,
-    meta: { hideHeader: true }
+    meta: { hideHeader: true },
   },
   {
-    path: '/pacotes',
-    name: 'Pacotes',
-    component: Pacotes
+    path: "/pacotes",
+    name: "Pacotes",
+    component: Pacotes,
   },
   {
-    path: '/clientes',
-    name: 'Clientes',
-    component: Clientes
+    path: "/clientes",
+    name: "Clientes",
+    component: Clientes,
   },
   {
-    path: '/relatorios',
-    name: 'Relatorios',
-    component: Relatorios
+    path: "/relatorios",
+    name: "Relatorios",
+    component: Relatorios,
   },
   {
-    path: '/pacotes/:id',
-    name: 'PacoteDetail',
-    component: PacoteDetail
-  }
-]
+    path: "/banhos-avulsos",
+    name: "BanhosAvulsos",
+    component: BanhosAvulsos,
+  },
+  {
+    path: "/pacotes/:id",
+    name: "PacoteDetail",
+    component: PacoteDetail,
+  },
+  {
+    path: "/clientes/:id",
+    name: "ClienteDetail",
+    component: ClienteDetail,
+  },
+  {
+    path: "/whatsapp",
+    name: "WhatsAppConfig",
+    component: WhatsAppConfig,
+  },
+  {
+    path: "/comandas-impressao",
+    name: "ComandasImpressao",
+    component: ComandasImpressao,
+  },
+];
 
 const router = createRouter({
   history: createWebHistory(),
-  routes
-})
+  routes,
+});
 
 router.beforeEach((to, from, next) => {
   // Evita divergência entre store e localStorage.
   // Mesmo que o store demore/ falhe em inicializar, o guard usa o token persistido.
-  const token = localStorage.getItem('token')
-  const isAuthenticated = !!token
+  const token = localStorage.getItem("token");
+  const isAuthenticated = !!token;
 
-  if (to.path !== '/login' && !isAuthenticated) {
-    next('/login')
-  } else if (to.path === '/login' && isAuthenticated) {
-    next('/')
+  if (to.path !== "/login" && !isAuthenticated) {
+    next("/login");
+  } else if (to.path === "/login" && isAuthenticated) {
+    next("/");
   } else {
-    next()
+    next();
   }
-})
+});
 
-
-export default router
+export default router;

@@ -2,76 +2,95 @@
   <div class="dashboard">
     <div class="page-header">
       <h1 class="page-title">Dashboard</h1>
-    </div>
-
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon">👥</div>
-        <div class="stat-value">{{ clientesStore.totalClientes }}</div>
-        <div class="stat-label">Clientes</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">🐕</div>
-        <div class="stat-value">{{ totalCachorros }}</div>
-        <div class="stat-label">Cachorros</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">📦</div>
-        <div class="stat-value">{{ pacotesStore.pacotesAtivos.length }}</div>
-        <div class="stat-label">Pacotes Ativos</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">💰</div>
-        <div class="stat-value">R$ {{ formatarValor(pacotesStore.totalReceitaPrevista) }}</div>
-        <div class="stat-label">Receita Prevista</div>
+      <div class="periodo-filtro">
+        <label for="periodo-select">Período</label>
+        <select id="periodo-select" v-model="statsFiltro">
+          <option value="dia">Dia</option>
+          <option value="semana">Semana</option>
+          <option value="mes">Mês</option>
+          <option value="periodo">Período</option>
+          <option value="ano">Ano</option>
+        </select>
+        <template v-if="statsFiltro === 'periodo'">
+          <input type="date" v-model="statsPeriodoInicio" class="periodo-data" />
+          <span class="periodo-ate">até</span>
+          <input type="date" v-model="statsPeriodoFim" class="periodo-data" />
+        </template>
       </div>
     </div>
 
-    <div class="grid-2">
-      <div class="card">
-        <div class="card-title"><span class="card-title-bar"></span>📅 Calendário de Banhos</div>
-        <CalendarioMes :banhos="agendamentosStore.agendamentosDashboard" @data-selecionada="onDataSelecionada" />
-      </div>
-
-      <div class="card">
-      <div class="card-header-row">
-        <div class="card-title" style="margin-bottom:0"><span class="card-title-bar"></span>📋 Agendamentos — {{ formatarData(dataSelecionada) }}</div>
-        <button @click="carregarAgendamentos()" class="btn-refresh">↻ Atualizar</button>
-      </div>
-      <div v-if="agendamentosStore.agendamentosDashboard.length === 0" class="empty-state">
-        Nenhum agendamento nesta data. Clique no calendário para ver outros dias.
-      </div>
-      <div v-else class="agendamentos-list">
-        <div
-          v-for="ag in agendamentosStore.agendamentosDashboard"
-          :key="ag.id"
-          class="ag-card"
-          :class="ag.status_presenca"
-        >
-          <div class="ag-header">
-            <div>
-              <h4 class="ag-pet">{{ ag.pet_nome }}</h4>
-              <p class="ag-cliente">{{ ag.cliente_nome }}</p>
-            </div>
-            <span class="status-badge" :class="`status-${ag.status_presenca}`">
-              {{ ag.status_presenca.toUpperCase() }}
-            </span>
+    <div class="dashboard-main-grid">
+      <div class="dashboard-col-left">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon">👥</div>
+            <div class="stat-value">{{ totalClientesFiltrado }}</div>
+            <div class="stat-label">Clientes</div>
           </div>
-          <div class="ag-details">
-            <p>
-              <span class="link-pacote" @click="verDetalhes({ id: ag.pacote_id })" title="Clique para ver detalhes do pacote">
-                Pacote #{{ ag.pacote_id }}
-              </span>
-              | {{ formatarData(ag.data_banho) }}
-            </p>
-            <div v-if="ag.extras && Object.keys(ag.extras).length" class="extras">
-              <strong>Extras:</strong> {{ Object.entries(ag.extras).map(([k,v]) => `${k}: ${v}`).join(', ') }}
-            </div>
+          <div class="stat-card">
+            <div class="stat-icon">🐕</div>
+            <div class="stat-value">{{ totalCachorrosFiltrado }}</div>
+            <div class="stat-label">Cachorros</div>
           </div>
-          <button @click="editarAgendamento(ag)" class="btn-editar">Editar</button>
+          <div class="stat-card">
+            <div class="stat-icon">📦</div>
+            <div class="stat-value">{{ pacotesAtivosFiltrados.length }}</div>
+            <div class="stat-label">Pacotes Ativos</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">💰</div>
+            <div class="stat-value">R$ {{ formatarValor(receitaPrevistaFiltrada) }}</div>
+            <div class="stat-label">Receita Prevista</div>
+          </div>
         </div>
-      </div> 
-    </div>
+
+        <div class="card">
+          <div class="card-title"><span class="card-title-bar"></span>📅 Calendário de Banhos</div>
+          <CalendarioMes :banhos="agendamentosStore.agendamentosDashboard" @data-selecionada="onDataSelecionada" />
+        </div>
+      </div>
+
+      <div class="dashboard-col-right">
+        <div class="card card-agendamentos">
+          <div class="card-header-row">
+            <div class="card-title" style="margin-bottom:0"><span class="card-title-bar"></span>📋 Agendamentos — {{ formatarData(dataSelecionada) }}</div>
+            <div class="ag-header-actions">
+              <select v-model="turnoFiltro" @change="carregarAgendamentos()" class="select-turno">
+                <option value="todos">Todos os turnos</option>
+                <option value="manha">Manhã</option>
+                <option value="tarde">Tarde</option>
+              </select>
+              <button @click="carregarAgendamentos()" class="btn-refresh">↻ Atualizar</button>
+            </div>
+          </div>
+          <div v-if="agendamentosStore.agendamentosDashboard.length === 0" class="empty-state">
+            Nenhum agendamento nesta data. Clique no calendário para ver outros dias.
+          </div>
+          <div v-else class="agendamentos-list">
+            <template v-for="entry in agendamentosExibicao" :key="entry.tipo === 'divider' ? `divider-${entry.turno}` : entry.ag.id">
+              <div v-if="entry.tipo === 'divider'" class="turno-divider">
+                <span>{{ entry.turno === 'tarde' ? 'Tarde' : 'Manhã' }}</span>
+              </div>
+              <div
+                v-else
+                class="ag-card"
+                :class="entry.ag.status_presenca"
+                @click="editarAgendamento(entry.ag)"
+              >
+                <div class="ag-header">
+                  <div>
+                    <h4 class="ag-pet">{{ entry.ag.pet_nome }}</h4>
+                    <p class="ag-cliente">{{ entry.ag.cliente_nome }}</p>
+                  </div>
+                  <span class="status-badge" :class="`status-${entry.ag.status_presenca}`">
+                    {{ entry.ag.status_presenca.toUpperCase() }}
+                  </span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -110,9 +129,24 @@
           </select>
         </div>
         <div class="form-group">
-          <label for="edit-extras">Extras (JSON)</label>
-          <textarea id="edit-extras" v-model="agEdit.extras_str" rows="3" placeholder='{"observacao": "Banho extra"}'></textarea>
-          <small class="field-hint">Formato JSON simples</small>
+          <label for="edit-turno">Turno</label>
+          <select id="edit-turno" v-model="agEdit.turno">
+            <option value="manha">Manhã</option>
+            <option value="tarde">Tarde</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="edit-info">Itens Extra / Descrição</label>
+          <input id="edit-info" v-model="agEdit.extras.info" placeholder="Ex: Tosa higiênica, Shampoo especial..." />
+        </div>
+        <div class="form-group">
+          <label for="edit-valor-extra">Valor Extra (R$)</label>
+          <input
+            id="edit-valor-extra"
+            type="number"
+            step="0.01"
+            v-model.number="agEdit.extras.valor_extra"
+          />
         </div>
         <div class="modal-actions">
           <button @click="showModalEdit = false" class="btn btn-cancelar">Cancelar</button>
@@ -143,12 +177,98 @@ const showModalEdit = ref(false)
 const agEdit = ref(null)
 const showPagamento = ref(false)
 const pacoteSelecionado = ref(null)
+const turnoFiltro = ref('todos')
 
-const totalCachorros = computed(() =>
-  clientesStore.clientes.reduce((sum, c) => sum + (c.cachorros?.length || 0), 0)
+// Quando o filtro é "todos", agrupa manhã primeiro e tarde depois, com um
+// separador entre os dois grupos (sem separador se algum grupo estiver vazio).
+const agendamentosExibicao = computed(() => {
+  const lista = agendamentosStore.agendamentosDashboard
+  if (turnoFiltro.value !== 'todos') {
+    return lista.map(ag => ({ tipo: 'item', ag }))
+  }
+  const manha = lista.filter(ag => ag.turno !== 'tarde')
+  const tarde = lista.filter(ag => ag.turno === 'tarde')
+  const resultado = manha.map(ag => ({ tipo: 'item', ag }))
+  if (manha.length && tarde.length) {
+    resultado.push({ tipo: 'divider', turno: 'tarde' })
+  }
+  resultado.push(...tarde.map(ag => ({ tipo: 'item', ag })))
+  return resultado
+})
+
+// Filtro de período dos cards de estatística do topo
+const statsFiltro = ref('mes')
+const statsPeriodoInicio = ref('')
+const statsPeriodoFim = ref('')
+
+const statsRange = computed(() => {
+  const hoje = new Date()
+  hoje.setHours(0, 0, 0, 0)
+
+  if (statsFiltro.value === 'dia') {
+    const fim = new Date(hoje)
+    fim.setHours(23, 59, 59, 999)
+    return { inicio: hoje, fim }
+  }
+  if (statsFiltro.value === 'semana') {
+    const diaSemana = hoje.getDay()
+    const offsetSegunda = diaSemana === 0 ? 6 : diaSemana - 1
+    const inicio = new Date(hoje)
+    inicio.setDate(hoje.getDate() - offsetSegunda)
+    const fim = new Date(inicio)
+    fim.setDate(inicio.getDate() + 6)
+    fim.setHours(23, 59, 59, 999)
+    return { inicio, fim }
+  }
+  if (statsFiltro.value === 'ano') {
+    return {
+      inicio: new Date(hoje.getFullYear(), 0, 1),
+      fim: new Date(hoje.getFullYear(), 11, 31, 23, 59, 59, 999)
+    }
+  }
+  if (statsFiltro.value === 'periodo') {
+    const inicio = statsPeriodoInicio.value ? new Date(`${statsPeriodoInicio.value}T00:00:00`) : new Date(0)
+    const fim = statsPeriodoFim.value ? new Date(`${statsPeriodoFim.value}T23:59:59`) : new Date()
+    return { inicio, fim }
+  }
+  // mes (padrão)
+  return {
+    inicio: new Date(hoje.getFullYear(), hoje.getMonth(), 1),
+    fim: new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59, 999)
+  }
+})
+
+function dentroDoPeriodo(dataStr) {
+  if (!dataStr) return false
+  // O backend envia timestamps UTC sem sufixo de fuso (ex.: "2026-07-04T03:43:49"),
+  // que o JS interpretaria como hora local por padrão. Forçamos UTC para comparar corretamente.
+  const temFuso = /Z$|[+-]\d{2}:\d{2}$/.test(dataStr)
+  const d = new Date(temFuso ? dataStr : `${dataStr}Z`)
+  return d >= statsRange.value.inicio && d <= statsRange.value.fim
+}
+
+const totalClientesFiltrado = computed(() =>
+  clientesStore.clientes.filter(c => dentroDoPeriodo(c.criado_em)).length
 )
+const totalCachorrosFiltrado = computed(() =>
+  clientesStore.clientes.reduce(
+    (sum, c) => sum + (c.cachorros || []).filter(cc => dentroDoPeriodo(cc.criado_em)).length,
+    0
+  )
+)
+const pacotesAtivosFiltrados = computed(() =>
+  pacotesStore.pacotesAtivos.filter(p => dentroDoPeriodo(p.criado_em))
+)
+const receitaPrevistaFiltrada = computed(() =>
+  pacotesAtivosFiltrados.value.reduce((sum, p) => sum + (Number(p.valor_cobrado) || 0), 0)
+)
+
 const pacotesEmAberto = computed(() =>
-  pacotesStore.pacotes.filter(p => p.ativo && (p.status_pagamento === 'em_aberto' || p.status_pagamento === 'fechado'))
+  pacotesStore.pacotes.filter(p => p.ativo && (
+    p.status_pagamento === 'em_aberto' ||
+    p.status_pagamento === 'fechado' ||
+    p.status_pagamento === 'atrasado'
+  ))
 )
 const banhosRecentes = computed(() => {
   const banhos = []
@@ -170,7 +290,12 @@ function verDetalhes(pacote) {
 }
 async function confirmarPagamento(dados) {
   try {
-    await pacotesStore.registrarPagamento(dados.pacote_id, dados.valor_pago, dados.data_pagamento)
+    await pacotesStore.registrarPagamento(dados.pacote_id, {
+      valor_pago: dados.valor_pago,
+      data_pagamento: dados.data_pagamento,
+      tipo_pagamento: 'pix',
+      fechar_pacote: false
+    })
     showPagamento.value = false
     alert('Pagamento registrado com sucesso!')
   } catch (err) {
@@ -179,7 +304,8 @@ async function confirmarPagamento(dados) {
 }
 async function carregarAgendamentos() {
   try {
-    await agendamentosStore.fetchDashboard(dataSelecionada.value)
+    const turno = turnoFiltro.value === 'todos' ? null : turnoFiltro.value
+    await agendamentosStore.fetchDashboard(dataSelecionada.value, turno)
   } catch (err) {
     alert('Erro ao carregar agendamentos: ' + err.message)
   }
@@ -192,15 +318,24 @@ function formatarData(dataStr) {
   return new Date(dataStr).toLocaleDateString('pt-BR')
 }
 function editarAgendamento(ag) {
-  agEdit.value = { ...ag, extras_str: JSON.stringify(ag.extras || {}, null, 2) }
+  // Garante que 'extras' seja um objeto com as chaves esperadas
+  const extras = ag.extras || {}
+  agEdit.value = {
+    ...ag,
+    turno: ag.turno || 'manha',
+    extras: {
+      info: extras.info || '',
+      valor_extra: extras.valor_extra || 0
+    }
+  }
   showModalEdit.value = true
 }
 async function salvarAgendamento() {
   try {
-    const extras = JSON.parse(agEdit.value.extras_str || '{}')
     await agendamentosStore.updateStatus(agEdit.value.id, {
       status_presenca: agEdit.value.status_presenca,
-      extras
+      turno: agEdit.value.turno,
+      extras: agEdit.value.extras
     })
     showModalEdit.value = false
     alert('Agendamento atualizado!')
@@ -236,7 +371,14 @@ onMounted(async () => {
   --shadow:        0 2px 12px rgba(59,42,26,0.1);
 }
 
-.page-header { margin-bottom: 1.5rem; }
+.page-header {
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
 
 .page-title {
   font-size: 1.6rem;
@@ -246,17 +388,79 @@ onMounted(async () => {
   padding-left: 0.75rem;
 }
 
-/* STATS */
+.periodo-filtro {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.periodo-filtro label {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--marrom);
+}
+.periodo-filtro select,
+.periodo-filtro .periodo-data {
+  padding: 0.5rem 0.75rem;
+  border: 2px solid var(--creme-escuro);
+  border-radius: 7px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--marrom);
+  background: var(--creme);
+  transition: border-color 0.15s;
+}
+.periodo-filtro select:focus,
+.periodo-filtro .periodo-data:focus {
+  border-color: var(--dourado);
+  outline: none;
+}
+.periodo-ate { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; }
+
+/* LAYOUT PRINCIPAL: KPIs + Calendário à esquerda, Agendamentos à direita (altura total) */
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.2rem;
+  margin-bottom: 1.2rem;
+  align-items: stretch;
+}
+.dashboard-col-left {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+.dashboard-col-right {
+  display: flex;
+  flex-direction: column;
+}
+.dashboard-col-left .card,
+.dashboard-col-right .card {
+  margin-bottom: 0;
+}
+.card-agendamentos {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 480px;
+}
+.card-agendamentos .empty-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* STATS (compactos, 2 por linha) */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
 }
 .stat-card {
   background: var(--white);
   border-radius: var(--radius);
-  padding: 1.4rem 1rem;
+  padding: 0.9rem 0.7rem;
   text-align: center;
   box-shadow: var(--shadow);
   border-top: 4px solid var(--dourado);
@@ -266,12 +470,11 @@ onMounted(async () => {
 .stat-card:nth-child(3) { border-top-color: var(--marrom-claro); }
 .stat-card:nth-child(4) { border-top-color: var(--verde-claro); }
 .stat-card:hover { transform: translateY(-3px); }
-.stat-icon { font-size: 1.8rem; margin-bottom: 0.4rem; }
-.stat-value { font-size: 1.9rem; font-weight: 800; color: var(--marrom); line-height: 1.1; }
-.stat-label { color: var(--text-muted); font-size: 0.82rem; font-weight: 700; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-icon { font-size: 1.3rem; margin-bottom: 0.25rem; }
+.stat-value { font-size: 1.25rem; font-weight: 800; color: var(--marrom); line-height: 1.1; }
+.stat-label { color: var(--text-muted); font-size: 0.68rem; font-weight: 700; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.4px; }
 
 /* GRID */
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin-bottom: 1.2rem; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
 
 /* CARD */
@@ -302,7 +505,31 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
   margin-bottom: 1rem;
+}
+
+/* AÇÕES DO CARD DE AGENDAMENTOS */
+.ag-header-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 0.6rem;
+}
+.select-turno {
+  padding: 0.5rem 0.75rem;
+  border: 2px solid var(--creme-escuro);
+  border-radius: 7px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--marrom);
+  background: var(--creme);
+  transition: border-color 0.15s;
+}
+.select-turno:focus {
+  border-color: var(--dourado);
+  outline: none;
 }
 
 /* BOTÃO REFRESH */
@@ -329,29 +556,48 @@ onMounted(async () => {
 }
 
 /* AGENDAMENTOS */
-.agendamentos-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.agendamentos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.turno-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.2rem 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.turno-divider::before,
+.turno-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--creme-escuro);
+}
 .ag-card {
   background: var(--creme);
   border: 1px solid var(--creme-escuro);
   border-radius: var(--radius);
   padding: 1rem 1.2rem;
   border-left: 4px solid var(--dourado);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
 }
+.ag-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
 .ag-card.pendente  { border-left-color: #d4a843; }
 .ag-card.concluido { border-left-color: var(--verde); background: var(--verde-bg); }
 .ag-card.faltou    { border-left-color: #b94040; background: #fdf0f0; }
-.ag-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; }
+.ag-header { display: flex; justify-content: space-between; align-items: flex-start; }
 .ag-pet { font-size: 1rem; font-weight: 800; color: var(--marrom); margin: 0; }
 .ag-cliente { color: var(--text-muted); font-size: 0.85rem; margin: 2px 0 0; }
-.link-pacote {
-  color: var(--marrom-claro);
-  font-weight: 700;
-  text-decoration: underline;
-  cursor: pointer;
-  transition: color 0.2s;
-}
-.link-pacote:hover { color: var(--dourado); }
-.ag-details { font-size: 0.85rem; color: var(--text-muted); }
 
 .status-badge {
   padding: 3px 10px;
@@ -363,20 +609,6 @@ onMounted(async () => {
 .status-pendente  { background: var(--dourado-claro); color: #6b4c00; }
 .status-concluido { background: var(--verde-bg); color: var(--verde); }
 .status-faltou    { background: #fdeaea; color: #b94040; }
-
-.btn-editar {
-  background: var(--marrom);
-  color: var(--dourado);
-  border: none;
-  padding: 6px 14px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.85rem;
-  font-weight: 700;
-  margin-top: 0.5rem;
-  transition: background 0.15s;
-}
-.btn-editar:hover { background: var(--marrom-medio); }
 
 /* MODAL */
 .modal-overlay {
@@ -402,12 +634,13 @@ onMounted(async () => {
   font-weight: 700; font-size: 0.9rem; color: var(--marrom);
 }
 .form-group select,
+.form-group input,
 .form-group textarea {
   width: 100%; padding: 0.6rem 0.75rem;
   border: 2px solid var(--creme-escuro);
   border-radius: 7px; font-size: 0.95rem;
   color: var(--text); background: var(--creme);
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
   box-sizing: border-box;
 }
 .form-group select:focus,
@@ -420,4 +653,9 @@ onMounted(async () => {
 .btn-primario:hover { background: var(--marrom-medio); }
 .btn-cancelar { background: var(--creme-escuro); color: var(--marrom); flex: 1; }
 .btn-cancelar:hover { background: #e0d5c2; }
+
+@media (max-width: 900px) {
+  .dashboard-main-grid { grid-template-columns: 1fr; }
+  .card-agendamentos { min-height: 320px; }
+}
 </style>

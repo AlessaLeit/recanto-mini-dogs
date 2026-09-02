@@ -6,8 +6,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "5432:5432"
+    # Sem 'ports': o Postgres só precisa ser acessível pelo backend, que está
+    # na mesma rede Docker. Publicar 5432 para a internet é risco desnecessário.
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -15,6 +15,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
     networks:
       - petshop_network
 
@@ -34,10 +35,7 @@ services:
       CACHE_LOCAL_ENABLED: "true"
       CORS_ORIGIN: "*"
       LOG_LEVEL: "INFO"
-    # Sem 'ports': só acessível dentro da rede interna do Docker. O backend
-    # expõe o QR code / status através de endpoints autenticados (JWT) em
-    # /api/v1/whatsapp/*, então não precisamos publicar a porta 8080 do
-    # Evolution API na máquina/host.
+    # Sem 'ports': só acessível dentro da rede interna do Docker, igual em dev.
     volumes:
       - evolution_instances:/evolution/instances
     depends_on:
@@ -48,35 +46,31 @@ services:
       - petshop_network
 
   backend:
-    # extra_hosts:
-    #  - "host.docker.internal:host-gateway"  # Minha rede docker interna vai rodar utilizando a rede da minha máquina / host
-    # dns:
-    #  - 8.8.8.8 google
-    #  - 1.1.1.1 cloudflare
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
+    # Sem 'build': em produção só puxamos a imagem já publicada no Docker Hub
+    # pelo GitHub Actions. Sem bind-mount do código: o container roda só com
+    # o que foi empacotado na imagem, sem depender de arquivos soltos no host.
     image: alessaleit/pacotesbanho-backend:latest
     container_name: petshop_backend
     env_file:
       - .env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres_local:5432/${POSTGRES_DB}
-      DEBUG: "true"
-      LOG_LEVEL: "debug"
+      DEBUG: "false"
+      LOG_LEVEL: "info"
       EVOLUTION_API_URL: http://evolution_api:8080
       EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
       EVOLUTION_INSTANCE_NAME: ${EVOLUTION_INSTANCE_NAME:-recanto-minidogs}
+    # Publicada só em loopback: dá pra checar com 'curl localhost:8000/health'
+    # direto no servidor (via SSH), mas não fica exposta à internet — o
+    # público só entra pelo frontend (porta 80), que já faz proxy pro backend
+    # através da rede Docker interna (frontend/nginx.conf).
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     depends_on:
       postgres_local:
         condition: service_healthy
       evolution_api:
         condition: service_started
-    volumes:
-      - ./backend:/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level debug
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -88,13 +82,11 @@ services:
       - petshop_network
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
     image: alessaleit/pacotesbanho-frontend:latest
     container_name: petshop_frontend
     ports:
-      # Mapeamos a porta 80 do host para a nova porta 8080 do container
+      # O container roda nginx como usuário não-root, que não pode bindar a
+      # porta 80 internamente — por isso o nginx.conf escuta na 8080.
       - "80:8080"
     environment:
       API_HOST: backend
@@ -102,6 +94,7 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    restart: unless-stopped
     networks:
       - petshop_network
 

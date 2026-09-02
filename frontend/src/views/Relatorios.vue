@@ -63,7 +63,7 @@
             >
               <div class="item-titulo">{{ item.cachorro.nome }} — {{ item.cliente.nome }}</div>
               <div class="item-sub">{{ item.tipo_plano }} · R$ {{ formatarValor(item.valor_cobrado) }}</div>
-              <div class="item-contato" v-if="item.cliente.telefone">📞 {{ item.cliente.telefone }}</div>
+              <div class="item-contato" v-if="item.cliente.whatsapp">💬 {{ item.cliente.whatsapp }}</div>
             </div>
           </div>
         </div>

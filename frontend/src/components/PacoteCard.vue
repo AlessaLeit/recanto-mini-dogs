@@ -1,7 +1,10 @@
 <template>
   <div class="pacote-card" :class="{ inativo: !pacote.ativo }">
     <div class="card-header">
-      <h3 class="plano-label">{{ tipoPlanoLabel }}</h3>
+      <div class="card-header-titles">
+        <h3 class="cliente-pet-label">{{ nomeClientePet }}</h3>
+        <p class="plano-label">{{ tipoPlanoLabel }}</p>
+      </div>
       <span class="badge" :class="statusClass">{{ statusPagamento }}</span>
     </div>
 
@@ -20,15 +23,19 @@
         <span class="info-label">Limite / Mês</span>
         <span class="info-val">{{ pacote.limite_banhos_mes }} banhos</span>
       </div>
-      <div class="info-row" v-if="pacote.data_pagamento">
-        <span class="info-label">Pago em</span>
-        <span class="info-val">{{ formatarData(pacote.data_pagamento) }}</span>
+      <div class="info-row" v-if="pacote.status_pagamento === 'pago' && pacote.pagamentos?.length">
+        <span class="info-label">Último Pagamento</span>
+        <span class="info-val">{{ formatarData(pacote.pagamentos[pacote.pagamentos.length - 1].data_pagamento) }}</span>
+      </div>
+      <div class="info-row" v-if="pacote.status_pagamento === 'parcial' || pacote.status_pagamento === 'atrasado'">
+        <span class="info-label">Saldo Devedor</span>
+        <span class="info-val" style="color: #b94040;">R$ {{ formatarValor(pacote.valor_cobrado - pacote.valor_pago) }}</span>
       </div>
     </div>
 
     <div class="card-actions">
       <button
-        v-if="pacote.status_pagamento === 'em_aberto'"
+        v-if="pacote.status_pagamento === 'em_aberto' || pacote.status_pagamento === 'parcial' || pacote.status_pagamento === 'atrasado'"
         @click="$emit('pagar', pacote)"
         class="btn btn-dourado"
       >💰 Registrar Pagamento</button>
@@ -43,6 +50,11 @@ import { computed } from 'vue'
 const props = defineProps({ pacote: { type: Object, required: true } })
 defineEmits(['pagar', 'detalhes'])
 
+const nomeClientePet = computed(() => {
+  const partes = [props.pacote.cliente_nome, props.pacote.pet_nome].filter(Boolean)
+  return partes.length ? partes.join(' - ') : ''
+})
+
 const tipoPlanoLabel = computed(() => ({
   semanal: '📅 Semanal (4×/mês)',
   quinzenal: '📅 Quinzenal (2×/mês)',
@@ -52,13 +64,16 @@ const tipoPlanoLabel = computed(() => ({
 const statusPagamento = computed(() => ({
   em_aberto: 'Em Aberto',
   pago: 'Pago',
-  parcial: 'Parcial'
+  parcial: 'Parcial',
+  atrasado: 'Atrasado',
+  fechado: 'Fechado'
 }[props.pacote.status_pagamento] || 'Desconhecido'))
 
 const statusClass = computed(() => ({
-  'badge-aberto':  props.pacote.status_pagamento === 'em_aberto',
-  'badge-pago':    props.pacote.status_pagamento === 'pago',
-  'badge-parcial': props.pacote.status_pagamento === 'parcial'
+  'badge-aberto':   props.pacote.status_pagamento === 'em_aberto',
+  'badge-pago':     props.pacote.status_pagamento === 'pago',
+  'badge-parcial':  props.pacote.status_pagamento === 'parcial',
+  'badge-atrasado': props.pacote.status_pagamento === 'atrasado'
 }))
 
 function formatarValor(valor) { return Number(valor).toFixed(2).replace('.', ',') }
@@ -92,19 +107,25 @@ function formatarData(data) { return new Date(data).toLocaleDateString('pt-BR') 
 .pacote-card.inativo { opacity: 0.6; background: var(--creme); }
 
 .card-header {
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 0.6rem;
   padding: 1rem 1.2rem 0.8rem;
   border-bottom: 2px solid var(--creme-escuro);
 }
-.plano-label { font-size: 0.95rem; font-weight: 800; color: var(--marrom); margin: 0; }
+.card-header-titles { min-width: 0; }
+.cliente-pet-label {
+  font-size: 0.95rem; font-weight: 800; color: var(--marrom); margin: 0 0 0.2rem;
+}
+.plano-label { font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin: 0; }
 
 .badge {
   padding: 3px 10px; border-radius: 5px;
   font-size: 0.75rem; font-weight: 800;
 }
-.badge-aberto  { background: var(--dourado-claro); color: #6b4c00; }
-.badge-pago    { background: var(--verde-bg); color: var(--verde); }
-.badge-parcial { background: #fef0e0; color: #8b5e00; }
+.badge-aberto   { background: var(--dourado-claro); color: #6b4c00; }
+.badge-pago     { background: var(--verde-bg); color: var(--verde); }
+.badge-parcial  { background: #fef0e0; color: #8b5e00; }
+.badge-atrasado { background: #fdeaea; color: #b94040; }
 
 .card-body { padding: 0.9rem 1.2rem; }
 .info-row {

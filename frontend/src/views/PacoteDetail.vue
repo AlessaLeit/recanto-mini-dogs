@@ -30,12 +30,27 @@
       <div class="info-card clickable" @click="abrirEditarPacote" title="Clique para editar valores">
         <span class="info-label">Valor Base do Banho</span>
         <span class="info-value">R$ {{ formatarValor(pacote?.valor_banho_base || 0) }}</span>
+        <span class="info-sub" v-if="qtdCachorros > 1">
+          {{ qtdCachorros }} cachorros = R$ {{ formatarValor(valorBanhoEquivalente) }}/dia
+        </span>
       </div>
 
       <div class="info-card clickable" @click="abrirEditarPacote" title="Clique para editar valores">
         <span class="info-label">Valor Cobrado (Pacote)</span>
         <span class="info-value">R$ {{ formatarValor(pacote?.valor_cobrado) }}</span>
       </div>
+
+      <div class="info-card status-pago">
+        <span class="info-label">Total Pago</span>
+        <span class="info-value">R$ {{ formatarValor(pacote?.valor_pago || 0) }}</span>
+        <span class="info-sub" v-if="valorRestante > 0" style="color: #b94040; font-weight: 700;">
+          Resta: R$ {{ formatarValor(valorRestante) }}
+        </span>
+        <span class="info-sub" v-else style="color: var(--verde); font-weight: 700;">
+          Pacote Quitado
+        </span>
+      </div>
+
 
       <div class="info-card clickable" @click="abrirEditarPacote" title="Clique para editar transporte">
         <span class="info-label">Transporte</span>
@@ -51,9 +66,15 @@
 
     <!-- Ações -->
     <div class="actions-bar">
-      <button @click="showAddExtra = true" class="btn btn-primario">
+      <button v-if="!pacote?.fechado" @click="showAddExtra = true" class="btn btn-primario">
         + Adicionar Banho Extra
       </button>
+      <div v-else class="pacote-fechado-aviso">
+        🔒 Pacote fechado — os banhos não podem ser alterados.
+        <button @click="reabrirPacoteAction" class="btn btn-ghost" :disabled="reabrindoPacote">
+          {{ reabrindoPacote ? 'Reabrindo...' : '🔓 Reabrir Pacote' }}
+        </button>
+      </div>
     </div>
 
     <!-- Tabela de Agendamentos -->
@@ -64,25 +85,36 @@
         <thead>
           <tr>
             <th>Data</th>
-            <th>Valor Banho</th>
-            <th>Itens Extra</th>
-            <th>Valor Extra</th>
             <th>Status</th>
-            <th>Ações</th>
+            <th>Itens Extras</th>
+            <th>Valor Banho</th>
+            <th>Valor Extra</th>
+            <th v-if="!pacote?.fechado">Ações</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="ag in agendamentos" :key="ag.id" :class="ag.status_presenca">
             <td><strong>{{ formatarData(ag.data_banho) }}</strong></td>
-            <td>R$ {{ formatarValor(pacote?.valor_banho_base || 0) }}</td>
-            <td class="clickable-cell" @click="abrirEditarExtras(ag)">{{ ag.extras?.info || '-' }}</td>
-            <td class="clickable-cell" @click="abrirEditarExtras(ag)">R$ {{ formatarValor(ag.extras?.valor_extra || 0) }}</td>
-            <td class="clickable-cell" @click="abrirEditarExtras(ag)">
-              <span class="status-badge" :class="ag.status_presenca">
+            <td :class="{ 'clickable-cell': !pacote?.fechado }" @click="!pacote?.fechado && abrirEditarExtras(ag)">
+              <!-- Pacote multi-cachorro: mostra o status de cada pet do dia -->
+              <template v-if="qtdCachorros > 1">
+                <span
+                  v-for="cachorro in cachorrosDoPacote"
+                  :key="cachorro.id"
+                  class="status-badge status-badge-pet"
+                  :class="statusDoCachorro(ag, cachorro.id)"
+                >
+                  {{ cachorro.nome }}: {{ statusDoCachorro(ag, cachorro.id).toUpperCase() }}
+                </span>
+              </template>
+              <span v-else class="status-badge" :class="ag.status_presenca">
                 {{ ag.status_presenca?.toUpperCase() }}
               </span>
             </td>
-            <td>
+            <td :class="{ 'clickable-cell': !pacote?.fechado }" @click="!pacote?.fechado && abrirEditarExtras(ag)">{{ ag.extras?.info || '-' }}</td>
+            <td>R$ {{ formatarValor(valorBanhoDia(ag)) }}</td>
+            <td :class="{ 'clickable-cell': !pacote?.fechado }" @click="!pacote?.fechado && abrirEditarExtras(ag)">R$ {{ formatarValor(ag.extras?.valor_extra || 0) }}</td>
+            <td v-if="!pacote?.fechado">
               <div class="acoes">
                 <button @click="abrirEditarExtras(ag)" class="btn-acao btn-acao-verde" title="Adicionar Item Extra">+</button>
                 <button @click="abrirEditarData(ag)" class="btn-acao btn-acao-ghost" title="Editar data">📅</button>
@@ -103,14 +135,65 @@
         Nenhum agendamento encontrado.
       </div>
     </div>
+
+    <!-- Histórico de Pagamentos -->
+    <div class="pagamentos-section" v-if="pacote?.pagamentos?.length">
+      <h3 class="section-title"><span class="section-title-bar"></span> Histórico de Pagamentos</h3>
+      <table class="pagamentos-table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Valor Pago</th>
+            <th>Método</th>
+            <th>Observação</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="pg in pacote.pagamentos" :key="pg.id">
+            <td><strong>{{ formatarData(pg.data_pagamento) }}</strong></td>
+            <td>R$ {{ formatarValor(pg.valor_pago) }}</td>
+            <td>{{ formatarTipoPagamento(pg.tipo_pagamento) }}</td>
+            <td class="col-observacao">{{ pg.observacao || '-' }}</td>
+            <td>
+              <div class="acoes">
+                <button @click="abrirEditarPagamento(pg)" class="btn-acao btn-acao-ghost" title="Editar pagamento">✏️</button>
+                <button @click="confirmarRemoverPagamento(pg)" class="btn-acao btn-acao-perigo" title="Excluir pagamento">✕</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+
       <!-- Seção de Exclusão: Movida para o final do card de agendamentos -->
       <div class="footer-danger-zone">
         <button @click="confirmarDeletarPacote" class="btn btn-perigo" title="Excluir este pacote">🗑️ Excluir Pacote</button>
         <div class="footer-actions">
-          <button v-if="pacote?.status_pagamento === 'em_aberto'" @click="fecharPacote" class="btn btn-ghost" style="border-color: var(--dourado); color: var(--marrom);">🔒 Fechar Pacote</button>
-          <button v-if="pacote?.status_pagamento !== 'pago'" @click="abrirPagamento" class="btn btn-primario" style="margin-left: 0.5rem;">💰 Marcar como Pago</button>
+          <button
+            v-if="pacote?.cliente_envio_comanda === 'whatsapp'"
+            @click="enviarComandaWhatsapp"
+            class="btn btn-ghost"
+            style="border-color: var(--verde); color: var(--verde);"
+            :disabled="enviandoComanda"
+          >
+            {{ enviandoComanda ? 'Enviando...' : '💬 Enviar Comanda' }}
+          </button>
+          <button
+            v-if="!pacote?.fechado"
+            @click="fecharPacoteAction"
+            class="btn btn-ghost"
+            style="border-color: var(--dourado); color: var(--marrom); margin-left: 0.5rem;"
+            :disabled="!todosBanhosResolvidos || fechandoPacote"
+            :title="todosBanhosResolvidos ? '' : 'Marque todos os banhos como concluído ou faltou antes de fechar'"
+          >
+            {{ fechandoPacote ? 'Fechando...' : '🔒 Fechar Pacote' }}
+          </button>
+          <button v-if="pacote?.status_pagamento !== 'pago'" @click="abrirPagamento()" class="btn btn-primario" style="margin-left: 0.5rem;">💰 Registrar Pagamento</button>
         </div>
       </div>
+      
     <!-- ── MODAL: Editar Data ── -->
     <div class="modal" v-if="showEditData">
       <div class="modal-overlay" @click="showEditData = false"></div>
@@ -177,7 +260,7 @@
           </div>
         </div>
 
-        <div class="grid-form">
+        <div class="grid-form" v-if="cachorrosAdicionaisPacote.length === 0">
           <div class="form-group">
             <label for="valor-base">Valor Base Banho (R$)</label>
             <input id="valor-base" type="number" step="0.01" v-model.number="formPacote.valor_banho_base" @input="handleInputMudanca" />
@@ -187,6 +270,31 @@
             <input id="transporte" type="number" step="0.01" v-model.number="formPacote.valor_transporte" @input="handleInputMudanca" />
           </div>
         </div>
+
+        <template v-else>
+          <div class="grid-form">
+            <div class="form-group">
+              <label for="valor-base">Valor do Banho — {{ cachorroPrincipalPacote?.nome }} (R$)</label>
+              <input id="valor-base" type="number" step="0.01" v-model.number="formPacote.valor_banho_base" @input="handleInputMudanca" />
+            </div>
+            <div class="form-group" v-for="cachorro in cachorrosAdicionaisPacote" :key="cachorro.id">
+              <label :for="'valor-extra-' + cachorro.id">Valor do Banho — {{ cachorro.nome }} (R$)</label>
+              <input
+                :id="'valor-extra-' + cachorro.id"
+                type="number"
+                step="0.01"
+                v-model.number="formValoresCachorros[cachorro.id]"
+                @input="handleInputMudanca"
+              />
+            </div>
+          </div>
+          <div class="grid-form">
+            <div class="form-group">
+              <label for="transporte">Transporte Total (R$)</label>
+              <input id="transporte" type="number" step="0.01" v-model.number="formPacote.valor_transporte" @input="handleInputMudanca" />
+            </div>
+          </div>
+        </template>
 
         <div class="form-group form-highlight">
           <label for="valor-cobrado">Valor Total Cobrado (R$)</label>
@@ -211,13 +319,36 @@
           <h3>Editar Agendamento</h3>
           <p class="modal-sub">✨ {{ pacote?.pet_nome }}</p>
         </div>
-        <div class="form-group">
+        <!-- Pacote com 1 cachorro: um único status para o dia -->
+        <div class="form-group" v-if="qtdCachorros === 1">
           <label for="edit-status">Status de Presença</label>
           <select id="edit-status" v-model="formExtras.status_presenca">
             <option value="pendente">🟡 PENDENTE</option>
             <option value="concluido">🟢 CONCLUÍDO</option>
             <option value="faltou">🔴 FALTOU / CANCELADO</option>
           </select>
+        </div>
+
+        <!-- Pacote multi-cachorro: um status por pet, pois cada um pode
+             faltar individualmente no mesmo dia. -->
+        <div class="form-group" v-else>
+          <label>Status de Presença</label>
+          <div class="presencas-grid">
+            <div class="presenca-pet" v-for="cachorro in cachorrosDoPacote" :key="cachorro.id">
+              <div class="presenca-pet-topo">
+                <span class="presenca-pet-nome">🐶 {{ cachorro.nome }}</span>
+                <span class="presenca-pet-valor">R$ {{ formatarValor(valorDoCachorro(cachorro.id)) }}</span>
+              </div>
+              <select :id="'status-pet-' + cachorro.id" v-model="formExtras.presencas[cachorro.id]">
+                <option value="pendente">🟡 PENDENTE</option>
+                <option value="concluido">🟢 CONCLUÍDO</option>
+                <option value="faltou">🔴 FALTOU / CANCELADO</option>
+              </select>
+            </div>
+          </div>
+          <small class="helper-text">
+            Banho do dia: R$ {{ formatarValor(valorBanhoFormExtras) }} — só os pets concluídos são cobrados.
+          </small>
         </div>
         <div class="form-group">
           <label for="edit-info">Itens Extra / Descrição</label>
@@ -254,12 +385,12 @@
       </div>
     </div>
 
-    <!-- ── MODAL: Registrar Pagamento ── -->
+    <!-- ── MODAL: Registrar/Editar Pagamento ── -->
     <div class="modal" v-if="showModalPagamento">
       <div class="modal-overlay" @click="showModalPagamento = false"></div>
       <div class="modal-content">
         <div class="modal-header">
-          <h3>Registrar Pagamento</h3>
+          <h3>{{ pagamentoEditando ? 'Editar Pagamento' : 'Registrar Pagamento' }}</h3>
           <p class="modal-sub">💰 {{ pacote?.pet_nome }}</p>
         </div>
         <div class="form-group">
@@ -267,12 +398,45 @@
           <input id="pagamento-valor" type="number" step="0.01" v-model.number="formPagamento.valor_pago" />
         </div>
         <div class="form-group">
+            <label for="pagamento-tipo">Método de Pagamento</label>
+            <select id="pagamento-tipo" v-model="formPagamento.tipo_pagamento">
+              <option value="pix">Pix</option>
+              <option value="dinheiro">Dinheiro</option>
+              <option value="cartao_debito">Cartão de Débito</option>
+              <option value="cartao_credito">Cartão de Crédito</option>
+              <option value="outro">Outro</option>
+            </select>
+          </div>
+        <div class="form-group">
           <label for="pagamento-data">Data do Pagamento</label>
           <input id="pagamento-data" type="date" v-model="formPagamento.data_pagamento" />
         </div>
+        <div class="form-group">
+          <label for="pagamento-observacao">Observação (opcional)</label>
+          <textarea id="pagamento-observacao" v-model="formPagamento.observacao" rows="2" placeholder="Ex: pagamento referente à segunda parcela"></textarea>
+        </div>
         <div class="modal-actions">
           <button @click="showModalPagamento = false" class="btn btn-cancelar">Cancelar</button>
-          <button @click="confirmarPagamento" class="btn btn-primario">Confirmar Recebimento</button>
+          <button @click="confirmarPagamento" class="btn btn-primario">{{ pagamentoEditando ? 'Salvar Alterações' : 'Confirmar Recebimento' }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MODAL: Confirmar Exclusão de Pagamento ── -->
+    <div class="modal" v-if="showConfirmRemovePagamento">
+      <div class="modal-overlay" @click="showConfirmRemovePagamento = false"></div>
+      <div class="modal-content">
+        <div class="modal-header modal-header-danger">
+          <h3>⚠️ Confirmar Exclusão</h3>
+        </div>
+        <p class="modal-info">
+          Excluir o pagamento de <strong>R$ {{ formatarValor(pagamentoRemovendo?.valor_pago) }}</strong>
+          em <strong>{{ formatarData(pagamentoRemovendo?.data_pagamento) }}</strong>?
+        </p>
+        <p class="warning-text">O status de pagamento do pacote será recalculado. Esta ação não pode ser desfeita.</p>
+        <div class="modal-actions">
+          <button @click="showConfirmRemovePagamento = false" class="btn btn-cancelar">Cancelar</button>
+          <button @click="executarRemoverPagamento" class="btn btn-perigo">Excluir</button>
         </div>
       </div>
     </div>
@@ -297,7 +461,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePacotesStore } from '../stores/pacotes.js'
 
@@ -308,6 +472,9 @@ const pacotesStore = usePacotesStore()
 const pacote = ref(null)
 const agendamentos = ref([])
 const loading = ref(false)
+const enviandoComanda = ref(false)
+const fechandoPacote = ref(false)
+const reabrindoPacote = ref(false)
 
 // Modais
 const showEditData = ref(false)
@@ -317,29 +484,100 @@ const showConfirmDeletePacote = ref(false)
 const showModalExtras = ref(false)
 const showModalEditPacote = ref(false)
 const showModalPagamento = ref(false)
+const showConfirmRemovePagamento = ref(false)
 
 // Dados dos modais
 const agEditando = ref(null)
 const novaData = ref('')
 const dataExtra = ref('')
 const agRemovendo = ref(null)
+const pagamentoEditando = ref(null)
+const pagamentoRemovendo = ref(null)
 const agExtras = ref(null)
-const formExtras = ref({ info: '', valor_extra: 0, status_presenca: 'pendente' })
-const formPacote = ref({ tipo_plano: '', dia_da_semana: '', valor_banho_base: 0, valor_cobrado: 0, valor_transporte: 0 })
-const formPagamento = ref({ valor_pago: 0, data_pagamento: '' })
+// presencas: status por cachorro (id -> pendente/concluido/faltou) usado em
+// pacotes multi-cachorro, onde um pet pode faltar e o outro não no mesmo dia.
+const formExtras = ref({ info: '', valor_extra: 0, status_presenca: 'pendente', presencas: {} })
+const formPacote = ref({ tipo_plano: '', dia_da_semana: '', valor_banho_base: 0, valor_cobrado: 0, valor_transporte: 0 });
+// Valor do banho por cachorro adicional (pacotes multi-cachorro), keyed por id do cachorro.
+const formValoresCachorros = reactive({})
+const formPagamento = ref({ valor_pago: 0, data_pagamento: '', tipo_pagamento: 'pix', fechar_pacote: false, observacao: '' });
 const valorSugerido = ref(0)
 const sugestaoVisivel = ref(false)
 
 const pacoteId = computed(() => Number.parseInt(route.params.id, 10))
 
+const valorRestante = computed(() => {
+  if (!pacote.value) return 0;
+  return (pacote.value.valor_cobrado || 0) - (pacote.value.valor_pago || 0);
+});
+
+// Quantidade de cachorros do pacote (principal + adicionais). Pacotes com mais
+// de um cachorro banham juntos no mesmo dia, então o valor do dia soma o valor
+// de cada cachorro (calculado no backend em valor_banho_equivalente).
+const qtdCachorros = computed(() => pacote.value?.cachorros?.length || 1)
+
+const valorBanhoEquivalente = computed(() => pacote.value?.valor_banho_equivalente ?? (pacote.value?.valor_banho_base || 0))
+
+const cachorrosDoPacote = computed(() => pacote.value?.cachorros || [])
+
+// Valor do banho de cada cachorro (id -> valor), vindo do backend.
+function valorDoCachorro(cachorroId) {
+  const mapa = pacote.value?.valor_banho_por_cachorro || {}
+  const valor = mapa[String(cachorroId)]
+  return typeof valor === 'number' ? valor : (pacote.value?.valor_banho_base || 0)
+}
+
+// Status de um pet num agendamento: usa o status individual quando existe,
+// senão cai no status geral do dia (agendamentos antigos e pacotes de 1 pet).
+function statusDoCachorro(ag, cachorroId) {
+  return ag?.presencas?.[String(cachorroId)] || ag?.status_presenca || 'pendente'
+}
+
+// Valor de banho cobrado no dia: soma só os pets que realmente tomaram banho.
+function valorBanhoDia(ag) {
+  if (qtdCachorros.value === 1) {
+    return ag?.status_presenca === 'concluido' ? valorBanhoEquivalente.value : 0
+  }
+  return cachorrosDoPacote.value.reduce((soma, c) => (
+    statusDoCachorro(ag, c.id) === 'concluido' ? soma + valorDoCachorro(c.id) : soma
+  ), 0)
+}
+
+// Prévia do valor do dia enquanto o usuário edita as presenças no modal.
+const valorBanhoFormExtras = computed(() =>
+  cachorrosDoPacote.value.reduce((soma, c) => (
+    formExtras.value.presencas?.[c.id] === 'concluido' ? soma + valorDoCachorro(c.id) : soma
+  ), 0)
+)
+
+const cachorroPrincipalPacote = computed(() =>
+  pacote.value?.cachorros?.find(c => c.id === pacote.value.cachorro_id)
+)
+
+const cachorrosAdicionaisPacote = computed(() =>
+  (pacote.value?.cachorros || []).filter(c => c.id !== pacote.value?.cachorro_id)
+)
+
+// Só permite fechar o pacote quando todos os banhos do ciclo já foram
+// resolvidos (concluído ou faltou — nenhum pendente).
+const todosBanhosResolvidos = computed(() =>
+  agendamentos.value.length > 0 && agendamentos.value.every(ag => ag.status_presenca !== 'pendente')
+)
+
 const totalPacote = computed(() => {
   if (!pacote.value) return 0
-  const valorBase = pacote.value.valor_banho_base || 0
   const transporte = pacote.value.valor_transporte || 0
   const agendamentosTotal = agendamentos.value.reduce((sum, ag) => {
-    const valorExtra = ag.extras?.valor_extra || 0
-    return sum + valorBase + valorExtra
+    // Regra: só soma o banho dos pets que compareceram (em pacotes com mais de
+    // um cachorro, cada pet conta individualmente) e os extras do dia quando
+    // pelo menos um pet tomou banho.
+    const valorBanhoSomado = valorBanhoDia(ag)
+    const valorExtraSomado = ag.status_presenca === 'concluido' ? (ag.extras?.valor_extra || 0) : 0
+
+    return sum + valorBanhoSomado + valorExtraSomado
   }, 0)
+
+  // Transporte é fixo do mês/roteiro, então sempre soma.
   return agendamentosTotal + transporte
 })
 
@@ -350,8 +588,6 @@ async function carregarPacote() {
     pacote.value = data
     agendamentos.value = data.agendamentos || []
   } catch (err) {
-    console.error('Erro ao carregar pacote:', err)
-    alert('Erro ao carregar os dados do pacote. Por favor, tente novamente.')
   } finally {
     loading.value = false
   }
@@ -373,6 +609,11 @@ function formatarDiaSemana(dia) {
   return map[dia] || '-'
 }
 
+function formatarTipoPagamento(tipo) {
+  const map = { pix: 'Pix', dinheiro: 'Dinheiro', cartao_debito: 'Débito', cartao_credito: 'Crédito', outro: 'Outro' };
+  return map[tipo] || tipo;
+}
+
 function abrirEditarData(ag) {
   agEditando.value = ag
   novaData.value = ag.data_banho
@@ -386,34 +627,94 @@ async function salvarNovaData() {
     showEditData.value = false
     agEditando.value = null
     novaData.value = ''
-  } catch (err) {
-    console.error('Erro ao salvar nova data:', err)
-    alert('Erro ao atualizar a data do agendamento.')
-  }
-}
-
-async function fecharPacote() {
-  if (!confirm('Deseja fechar este pacote? Isso indica que todos os banhos foram realizados e o acerto financeiro deve ser feito.')) return
-  try {
-    await pacotesStore.fecharPacote(pacoteId.value)
-    await carregarPacote()
-    alert('Pacote fechado com sucesso! Agora você pode registrar o pagamento.')
-  } catch (err) { alert('Erro ao fechar pacote: ' + err) }
+  } catch (err) {}
 }
 
 function abrirPagamento() {
-  formPagamento.value.valor_pago = pacote.value.valor_cobrado
-  formPagamento.value.data_pagamento = new Date().toISOString().split('T')[0]
+  pagamentoEditando.value = null
+  formPagamento.value = {
+    valor_pago: valorRestante.value > 0 ? valorRestante.value : pacote.value.valor_cobrado,
+    data_pagamento: new Date().toISOString().split('T')[0],
+    tipo_pagamento: 'pix',
+    fechar_pacote: false,
+    observacao: ''
+  };
+  showModalPagamento.value = true
+}
+
+async function fecharPacoteAction() {
+  fechandoPacote.value = true
+  try {
+    await pacotesStore.fecharPacote(pacoteId.value)
+    await carregarPacote()
+  } catch (err) {
+    alert('Erro ao fechar pacote: ' + (err.response?.data?.detail || err.message || err))
+  } finally {
+    fechandoPacote.value = false
+  }
+}
+
+async function reabrirPacoteAction() {
+  reabrindoPacote.value = true
+  try {
+    await pacotesStore.reabrirPacote(pacoteId.value)
+    await carregarPacote()
+  } catch (err) {
+    alert('Erro ao reabrir pacote: ' + (err.response?.data?.detail || err.message || err))
+  } finally {
+    reabrindoPacote.value = false
+  }
+}
+
+function abrirEditarPagamento(pg) {
+  pagamentoEditando.value = pg
+  formPagamento.value = {
+    valor_pago: pg.valor_pago,
+    data_pagamento: pg.data_pagamento,
+    tipo_pagamento: pg.tipo_pagamento,
+    fechar_pacote: false,
+    observacao: pg.observacao || ''
+  };
   showModalPagamento.value = true
 }
 
 async function confirmarPagamento() {
   try {
-    await pacotesStore.registrarPagamento(pacoteId.value, formPagamento.value.valor_pago, formPagamento.value.data_pagamento)
-    showModalPagamento.value = false
-    await carregarPacote()
-    alert('Pagamento registrado com sucesso!')
+    if (pagamentoEditando.value) {
+      await pacotesStore.atualizarPagamento(pacoteId.value, pagamentoEditando.value.id, {
+        valor_pago: formPagamento.value.valor_pago,
+        data_pagamento: formPagamento.value.data_pagamento,
+        tipo_pagamento: formPagamento.value.tipo_pagamento,
+        observacao: formPagamento.value.observacao
+      })
+      showModalPagamento.value = false
+      await carregarPacote()
+      alert('Pagamento atualizado com sucesso!')
+    } else {
+      // A store agora lida com o fechamento se necessário
+      await pacotesStore.registrarPagamento(pacoteId.value, { ...formPagamento.value });
+      showModalPagamento.value = false
+      await carregarPacote()
+      alert('Pagamento registrado com sucesso!')
+    }
   } catch (err) { alert('Erro ao registrar pagamento: ' + err) }
+}
+
+function confirmarRemoverPagamento(pg) {
+  pagamentoRemovendo.value = pg
+  showConfirmRemovePagamento.value = true
+}
+
+async function executarRemoverPagamento() {
+  if (!pagamentoRemovendo.value) return
+  try {
+    await pacotesStore.deletarPagamento(pacoteId.value, pagamentoRemovendo.value.id)
+    showConfirmRemovePagamento.value = false
+    pagamentoRemovendo.value = null
+    await carregarPacote()
+  } catch (err) {
+    alert('Erro ao excluir pagamento: ' + err)
+  }
 }
 
 function abrirEditarPacote() {
@@ -424,16 +725,17 @@ function abrirEditarPacote() {
     valor_cobrado: pacote.value.valor_cobrado,
     valor_transporte: pacote.value.valor_transporte || 0
   }
-  
-  // Define o valor sugerido apenas como referência inicial sem alterar o valor_cobrado salvo
-  let qtd = 1
-  if (formPacote.value.tipo_plano === 'semanal') {
-    qtd = 4
-  } else if (formPacote.value.tipo_plano === 'quinzenal') {
-    qtd = 2
-  }
 
-  valorSugerido.value = (formPacote.value.valor_banho_base * qtd) + formPacote.value.valor_transporte
+  // Preenche um input de valor por cachorro adicional, usando o valor já
+  // customizado (valores_cachorros) ou o valor base como padrão editável.
+  Object.keys(formValoresCachorros).forEach(key => delete formValoresCachorros[key])
+  cachorrosAdicionaisPacote.value.forEach(c => {
+    const valorCustom = pacote.value.valores_cachorros?.[c.id]
+    formValoresCachorros[c.id] = valorCustom ?? pacote.value.valor_banho_base
+  })
+
+  // Define o valor sugerido apenas como referência inicial sem alterar o valor_cobrado salvo
+  calcularValorSugerido()
   sugestaoVisivel.value = true
   showModalEditPacote.value = true
 }
@@ -442,33 +744,44 @@ function handleInputMudanca() {
   recalcularSugerido()
 }
 
-function recalcularSugerido() {
-  let qtd = 1
-  if (formPacote.value.tipo_plano === 'semanal') {
-    qtd = 4
-  } else if (formPacote.value.tipo_plano === 'quinzenal') {
-    qtd = 2
-  }
-
+// Calcula apenas o valor sugerido (texto de referência), sem alterar formPacote.valor_cobrado.
+function calcularValorSugerido() {
+  const qtd = formPacote.value.tipo_plano === 'semanal' ? 4 : (formPacote.value.tipo_plano === 'quinzenal' ? 2 : 1)
   const valorBase = formPacote.value.valor_banho_base || 0
   const transporte = formPacote.value.valor_transporte || 0
-  
-  // Recalcula o sugerido: (Quantidade de banhos do plano * valor base) + Transporte total
-  valorSugerido.value = (valorBase * qtd) + transporte
-  
-  // Atualiza o valor final que será gravado no pacote
+
+  // Cada cachorro adicional soma seu próprio valor por banho; se vazio/inválido,
+  // assume o valor base do cachorro principal.
+  const valorPorBanho = cachorrosAdicionaisPacote.value.reduce((total, c) => {
+    const valorExtra = formValoresCachorros[c.id]
+    return total + (typeof valorExtra === 'number' && !Number.isNaN(valorExtra) ? valorExtra : valorBase)
+  }, valorBase)
+
+  valorSugerido.value = (valorPorBanho * qtd) + transporte
+}
+
+// Recalcula o sugerido E atualiza o valor final que será gravado (chamado quando o usuário edita).
+function recalcularSugerido() {
+  calcularValorSugerido()
   formPacote.value.valor_cobrado = valorSugerido.value
   sugestaoVisivel.value = true
 }
 
 async function salvarDadosPacote() {
   try {
-    await pacotesStore.atualizarPacote(pacoteId.value, { ...formPacote.value })
+    const valoresCachorros = Object.fromEntries(
+      Object.entries(formValoresCachorros).filter(([, v]) => typeof v === 'number' && !Number.isNaN(v))
+    )
+    const payload = { ...formPacote.value }
+    if (cachorrosAdicionaisPacote.value.length > 0) {
+      payload.valores_cachorros = valoresCachorros
+    }
+    await pacotesStore.atualizarPacote(pacoteId.value, payload)
     showModalEditPacote.value = false
     await carregarPacote()
   } catch (err) {
     console.error('Erro ao atualizar pacote:', err)
-    alert('Erro ao salvar as alterações do pacote.')
+    alert('Erro ao salvar as alterações do pacote: ' + (err.response?.data?.detail || err.message || err))
   }
 }
 
@@ -476,22 +789,40 @@ function abrirEditarExtras(ag) {
   agExtras.value = ag
   const info = ag.extras?.info || (typeof ag.extras === 'string' ? ag.extras : '')
   const valor = ag.extras?.valor_extra || 0
-  formExtras.value = { info, valor_extra: valor, status_presenca: ag.status_presenca || 'pendente' }
+
+  // Em pacotes multi-cachorro, cada pet começa com o status individual já
+  // salvo; sem registro individual, herda o status geral do dia.
+  const presencas = {}
+  cachorrosDoPacote.value.forEach(c => {
+    presencas[c.id] = statusDoCachorro(ag, c.id)
+  })
+
+  formExtras.value = {
+    info,
+    valor_extra: valor,
+    status_presenca: ag.status_presenca || 'pendente',
+    presencas
+  }
   showModalExtras.value = true
 }
 
 async function salvarExtras() {
   try {
-    await pacotesStore.updateAgendamento(agExtras.value.id, {
-      status_presenca: formExtras.value.status_presenca,
+    const payload = {
       extras: { info: formExtras.value.info, valor_extra: formExtras.value.valor_extra }
-    })
+    }
+
+    if (qtdCachorros.value > 1) {
+      // O backend deriva o status_presenca do dia a partir das presenças.
+      payload.presencas = { ...formExtras.value.presencas }
+    } else {
+      payload.status_presenca = formExtras.value.status_presenca
+    }
+
+    await pacotesStore.updateAgendamento(agExtras.value.id, payload)
     showModalExtras.value = false
     await carregarPacote()
-  } catch (err) {
-    console.error('Erro ao salvar extras:', err)
-    alert('Erro ao salvar os extras/observações do agendamento.')
-  }
+  } catch (err) {}
 }
 
 async function salvarExtra() {
@@ -500,10 +831,7 @@ async function salvarExtra() {
     await pacotesStore.adicionarExtra(pacoteId.value, dataExtra.value)
     showAddExtra.value = false
     dataExtra.value = ''
-  } catch (err) {
-    console.error('Erro ao adicionar banho extra:', err)
-    alert('Erro ao adicionar o banho extra.')
-  }
+  } catch (err) {}
 }
 
 function confirmarRemover(ag) {
@@ -513,6 +841,22 @@ function confirmarRemover(ag) {
 
 function confirmarDeletarPacote() {
   showConfirmDeletePacote.value = true
+}
+
+async function enviarComandaWhatsapp() {
+  if (!pacote.value?.cliente_whatsapp) {
+    alert('Este cliente não tem WhatsApp cadastrado. Adicione o número na tela de Clientes.')
+    return
+  }
+  enviandoComanda.value = true
+  try {
+    await pacotesStore.enviarComanda(pacoteId.value)
+    alert('Comanda enviada por WhatsApp com sucesso!')
+  } catch (err) {
+    alert('Erro ao enviar comanda: ' + (err.response?.data?.detail || err.message))
+  } finally {
+    enviandoComanda.value = false
+  }
 }
 
 async function executarDeletarPacote() {
@@ -531,10 +875,7 @@ async function executarRemover() {
     await pacotesStore.removerAgendamento(agRemovendo.value.id)
     showConfirmRemove.value = false
     agRemovendo.value = null
-  } catch (err) {
-    console.error('Erro ao remover agendamento:', err)
-    alert('Erro ao remover o agendamento selecionado.')
-  }
+  } catch (err) {}
 }
 
 onMounted(carregarPacote)
@@ -605,6 +946,7 @@ onMounted(carregarPacote)
 .status-pill.pago      { background: var(--verde-bg);      color: var(--verde); }
 .status-pill.parcial   { background: #fef0e0;              color: #8b5e00; }
 .status-pill.fechado   { background: #e0e0e0;              color: #424242; }
+.status-pill.atrasado  { background: #fdeaea;              color: #b94040; }
 
 /* ── INFO CARDS ── */
 .info-cards {
@@ -629,6 +971,7 @@ onMounted(carregarPacote)
 .info-card:nth-child(3) { border-bottom-color: var(--verde); }
 .info-card:nth-child(4) { border-bottom-color: var(--marrom-claro); }
 .info-card:nth-child(5) { border-bottom-color: var(--verde); }
+.info-card.status-pago { border-bottom-color: var(--marrom-claro); }
 
 .info-card.clickable { cursor: pointer; }
 .info-card.clickable:hover {
@@ -662,6 +1005,19 @@ onMounted(carregarPacote)
   margin-bottom: 1.4rem;
   display: flex;
   justify-content: flex-end;
+}
+
+.pacote-fechado-aviso {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--creme);
+  border: 2px solid var(--creme-escuro);
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
 }
 
 .footer-danger-zone {
@@ -752,6 +1108,15 @@ onMounted(carregarPacote)
   font-weight: 800;
   letter-spacing: 0.4px;
 }
+/* Badge por pet (pacotes multi-cachorro): uma linha por cachorro */
+.status-badge-pet {
+  display: block;
+  width: fit-content;
+  font-size: 0.68rem;
+  margin-bottom: 3px;
+}
+.status-badge-pet:last-child { margin-bottom: 0; }
+
 .status-badge.pendente  { background: var(--dourado-claro); color: #6b4c00; }
 .status-badge.concluido { background: var(--verde-bg);      color: var(--verde); }
 .status-badge.faltou    { background: #fdeaea;              color: #b94040; }
@@ -791,6 +1156,43 @@ onMounted(carregarPacote)
   padding: 3rem;
   color: var(--text-muted);
   font-style: italic;
+}
+
+/* Seção de Pagamentos */
+.pagamentos-section {
+  margin-top: 1.5rem;
+  background: var(--white); border-radius: var(--radius); padding: 1.5rem; box-shadow: var(--shadow);
+}
+.pagamentos-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.pagamentos-table th {
+  padding: 0.85rem 0.9rem;
+  text-align: left;
+  background: var(--creme);
+  font-weight: 800;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid var(--creme-escuro);
+}
+.pagamentos-table td {
+  padding: 0.85rem 0.9rem;
+  border-bottom: 1px solid var(--creme-escuro);
+  font-size: 0.9rem;
+  color: var(--text);
+  vertical-align: middle;
+}
+.pagamentos-table tbody tr:last-child td { border-bottom: none; }
+.pagamentos-table tbody tr:hover td { background: var(--creme); }
+.pagamentos-table .col-observacao {
+  color: var(--text-muted);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── BOTÕES GERAIS ── */
@@ -897,20 +1299,24 @@ onMounted(carregarPacote)
 }
 
 .form-group input,
-.form-group select {
+.form-group select,
+.form-group textarea {
   width: 100%;
   padding: 0.65rem 0.85rem;
   border: 2px solid var(--creme-escuro);
   border-radius: 7px;
   font-size: 0.95rem;
+  font-family: inherit;
   color: var(--text);
   background: var(--creme);
   box-sizing: border-box;
   transition: border-color 0.15s, box-shadow 0.15s;
   outline: none;
+  resize: vertical;
 }
 .form-group input:focus,
-.form-group select:focus {
+.form-group select:focus,
+.form-group textarea:focus {
   border-color: var(--dourado);
   box-shadow: 0 0 0 3px rgba(212,168,67,0.12);
   background: var(--white);
@@ -929,6 +1335,41 @@ onMounted(carregarPacote)
   font-size: 1.05rem;
   color: var(--marrom);
 }
+
+/* ── PRESENÇA POR PET (pacotes multi-cachorro) ── */
+.presencas-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.presenca-pet {
+  background: var(--creme);
+  border: 2px solid var(--creme-escuro);
+  border-radius: 8px;
+  padding: 0.7rem 0.8rem;
+}
+
+.presenca-pet-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.45rem;
+}
+
+.presenca-pet-nome {
+  font-weight: 800;
+  font-size: 0.88rem;
+  color: var(--marrom);
+}
+
+.presenca-pet-valor {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.presenca-pet select { background: var(--white); }
 
 .helper-text {
   color: var(--text-muted);

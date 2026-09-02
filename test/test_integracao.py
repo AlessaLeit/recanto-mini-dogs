@@ -180,3 +180,116 @@ def test_ct06_edicao_status_presenca():
     # Assert
     assert up_resp.status_code == 200
     assert up_resp.json()["status_presenca"] == "concluido"
+
+
+def _criar_pacote_dois_cachorros(valor_base=50.0, valor_segundo=30.0):
+    """
+    Cria um pacote com dois cachorros e valores de banho diferentes. Usa o plano
+    semanal (4 datas) para que resolver um agendamento não feche o ciclo todo,
+    o que bloquearia as edições seguintes do teste.
+    """
+    cli_id = client.post("/api/v1/clientes/", json={"nome": "Familia Souza"}).json()["id"]
+    dog1 = client.post("/api/v1/cachorros/", json={"nome": "Thor", "porte": "medio", "cliente_id": cli_id}).json()["id"]
+    dog2 = client.post("/api/v1/cachorros/", json={"nome": "Nina", "porte": "pequeno", "cliente_id": cli_id}).json()["id"]
+    pac = client.post("/api/v1/pacotes/", json={
+        "cachorro_id": dog1,
+        "tipo_plano": "semanal",
+        "valor_cobrado": 320.0,
+        "dia_da_semana": "quarta",
+        "valor_banho_base": valor_base,
+        "cachorros_adicionais_ids": [dog2],
+        "valores_adicionais": {str(dog2): valor_segundo},
+    })
+    assert pac.status_code == 201, pac.text
+    return pac.json()["id"], dog1, dog2
+
+
+def test_ct07_presenca_individual_cobra_somente_pet_presente():
+    """CT07: Em pacote com 2 pets, marcar só um como concluído cobra apenas o valor dele."""
+    # Arrange
+    pac_id, dog1, dog2 = _criar_pacote_dois_cachorros(valor_base=50.0, valor_segundo=30.0)
+    ag_id = client.get(f"/api/v1/agendamentos/?pacote_id={pac_id}").json()[0]["id"]
+
+    # Act: Thor tomou banho, Nina faltou
+    up = client.put(f"/api/v1/agendamentos/{ag_id}", json={
+        "presencas": {str(dog1): "concluido", str(dog2): "faltou"}
+    })
+
+    # Assert
+    assert up.status_code == 200, up.text
+    corpo = up.json()
+    assert corpo["status_presenca"] == "concluido"  # o dia conta como realizado
+    assert corpo["valor_banho_dia"] == 50.0         # só o valor do Thor
+    assert corpo["presencas"] == {str(dog1): "concluido", str(dog2): "faltou"}
+
+
+def test_ct08_presenca_individual_pendente_mantem_dia_pendente():
+    """CT08: Enquanto um pet estiver pendente, o dia continua pendente e nada é cobrado por ele."""
+    # Arrange
+    pac_id, dog1, dog2 = _criar_pacote_dois_cachorros()
+    ag_id = client.get(f"/api/v1/agendamentos/?pacote_id={pac_id}").json()[0]["id"]
+
+    # Act
+    up = client.put(f"/api/v1/agendamentos/{ag_id}", json={
+        "presencas": {str(dog1): "concluido", str(dog2): "pendente"}
+    })
+
+    # Assert
+    assert up.status_code == 200, up.text
+    assert up.json()["status_presenca"] == "pendente"
+    assert up.json()["valor_banho_dia"] == 50.0
+
+
+def test_ct09_ambos_faltaram_zera_valor_do_dia():
+    """CT09: Se os dois pets faltarem, o dia fica como faltou e não gera cobrança."""
+    # Arrange
+    pac_id, dog1, dog2 = _criar_pacote_dois_cachorros()
+    ag_id = client.get(f"/api/v1/agendamentos/?pacote_id={pac_id}").json()[0]["id"]
+
+    # Act
+    up = client.put(f"/api/v1/agendamentos/{ag_id}", json={
+        "presencas": {str(dog1): "faltou", str(dog2): "faltou"}
+    })
+
+    # Assert
+    assert up.status_code == 200, up.text
+    assert up.json()["status_presenca"] == "faltou"
+    assert up.json()["valor_banho_dia"] == 0.0
+
+
+def test_ct10_extras_nao_apagam_presenca_individual():
+    """CT10: Salvar itens extras (payload sem presencas) preserva o status por pet."""
+    # Arrange
+    pac_id, dog1, dog2 = _criar_pacote_dois_cachorros()
+    ag_id = client.get(f"/api/v1/agendamentos/?pacote_id={pac_id}").json()[0]["id"]
+    client.put(f"/api/v1/agendamentos/{ag_id}", json={
+        "presencas": {str(dog1): "concluido", str(dog2): "faltou"}
+    })
+
+    # Act
+    up = client.put(f"/api/v1/agendamentos/{ag_id}", json={
+        "extras": {"info": "Tosa higienica", "valor_extra": 15.0}
+    })
+
+    # Assert
+    assert up.status_code == 200, up.text
+    assert up.json()["presencas"] == {str(dog1): "concluido", str(dog2): "faltou"}
+    assert up.json()["valor_banho_dia"] == 50.0
+
+
+def test_ct11_status_do_dia_aplica_a_todos_os_pets():
+    """CT11: Definir o status do dia inteiro (ex.: pela agenda) reaplica a todos os pets."""
+    # Arrange
+    pac_id, dog1, dog2 = _criar_pacote_dois_cachorros()
+    ag_id = client.get(f"/api/v1/agendamentos/?pacote_id={pac_id}").json()[0]["id"]
+    client.put(f"/api/v1/agendamentos/{ag_id}", json={
+        "presencas": {str(dog1): "concluido", str(dog2): "faltou"}
+    })
+
+    # Act
+    up = client.put(f"/api/v1/agendamentos/{ag_id}", json={"status_presenca": "concluido"})
+
+    # Assert
+    assert up.status_code == 200, up.text
+    assert up.json()["presencas"] == {str(dog1): "concluido", str(dog2): "concluido"}
+    assert up.json()["valor_banho_dia"] == 80.0
