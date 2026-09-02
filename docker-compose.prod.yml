@@ -1,0 +1,105 @@
+services:
+  postgres_local:
+    image: postgres:15-alpine
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    # Sem 'ports': o Postgres só precisa ser acessível pelo backend, que está
+    # na mesma rede Docker. Publicar 5432 para a internet é risco desnecessário.
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - petshop_network
+
+  evolution_api:
+    image: evoapicloud/evolution-api:latest
+    container_name: petshop_evolution
+    environment:
+      SERVER_URL: http://evolution_api:8080
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres_local:5432/${EVOLUTION_DB_NAME:-evolution}?schema=evolution_api
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
+      DATABASE_SAVE_DATA_CONTACTS: "false"
+      DATABASE_SAVE_DATA_CHATS: "false"
+      CACHE_REDIS_ENABLED: "false"
+      CACHE_LOCAL_ENABLED: "true"
+      CORS_ORIGIN: "*"
+      LOG_LEVEL: "INFO"
+    # Sem 'ports': só acessível dentro da rede interna do Docker, igual em dev.
+    volumes:
+      - evolution_instances:/evolution/instances
+    depends_on:
+      postgres_local:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - petshop_network
+
+  backend:
+    # Sem 'build': em produção só puxamos a imagem já publicada no Docker Hub
+    # pelo GitHub Actions. Sem bind-mount do código: o container roda só com
+    # o que foi empacotado na imagem, sem depender de arquivos soltos no host.
+    image: alessaleit/pacotesbanho-backend:latest
+    container_name: petshop_backend
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres_local:5432/${POSTGRES_DB}
+      DEBUG: "false"
+      LOG_LEVEL: "info"
+      EVOLUTION_API_URL: http://evolution_api:8080
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      EVOLUTION_INSTANCE_NAME: ${EVOLUTION_INSTANCE_NAME:-recanto-minidogs}
+    # Publicada só em loopback: dá pra checar com 'curl localhost:8000/health'
+    # direto no servidor (via SSH), mas não fica exposta à internet — o
+    # público só entra pelo frontend (porta 80), que já faz proxy pro backend
+    # através da rede Docker interna (frontend/nginx.conf).
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      postgres_local:
+        condition: service_healthy
+      evolution_api:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - petshop_network
+
+  frontend:
+    image: alessaleit/pacotesbanho-frontend:latest
+    container_name: petshop_frontend
+    ports:
+      - "80:80"
+    environment:
+      API_HOST: backend
+      NGINX_ENVSUBST_FILTERED_ARGS: '$$API_HOST'
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - petshop_network
+
+networks:
+  petshop_network:
+    driver: bridge
+
+volumes:
+  pgdata:
+  evolution_instances:
