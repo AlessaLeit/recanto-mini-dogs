@@ -20,11 +20,13 @@ jobs:
         with:
           python-version: "3.11"
 
+      # pytest-cov e' obrigatorio: o pytest.ini do projeto define
+      # 'addopts = --cov=app ...', entao o pytest nem inicia sem o plugin.
       - name: Instalar dependencias
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest
+          pip install pytest pytest-cov
 
       - name: Rodar testes unitarios
         run: pytest test/test_unitario.py -q
