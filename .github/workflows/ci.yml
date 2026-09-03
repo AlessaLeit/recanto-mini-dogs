@@ -1,8 +1,8 @@
 name: CI
 
+# Valida Pull Requests antes do merge. O push direto na master e' coberto
+# pelo workflow de Deploy, que roda os mesmos testes antes de publicar.
 on:
-  push:
-    branches: [ master ]
   pull_request:
     branches: [ master ]
 
