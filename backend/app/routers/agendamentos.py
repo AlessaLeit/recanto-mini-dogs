@@ -6,13 +6,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database import get_db
+from app.auth import get_current_user
 from app.models import Agendamento
 from app.schemas import AgendamentoCreate, AgendamentoUpdate, AgendamentoResponse, AgendamentoAvulsoCreate
 from app.services.pacote_service import PacoteService
 from app.models import Pacote, Cachorro, Cliente
 from datetime import date
 
-router = APIRouter(tags=["Agendamentos"], redirect_slashes=True)
+router = APIRouter(
+    tags=["Agendamentos"],
+    redirect_slashes=True,
+    dependencies=[Depends(get_current_user)],
+)
 
 
 def _bloquear_se_pacote_fechado(agendamento: Agendamento) -> None:

@@ -5,10 +5,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from app.database import get_db
+from app.auth import get_current_user
 from app.models import Cliente, Cachorro
 from app.schemas import ClienteCreate, ClienteUpdate, ClienteResponse, ClienteWithCachorros
 
-router = APIRouter(tags=["Clientes"], redirect_slashes=True)
+router = APIRouter(
+    tags=["Clientes"],
+    redirect_slashes=True,
+    dependencies=[Depends(get_current_user)],
+)
 
 
 @router.post("/", response_model=ClienteWithCachorros, status_code=status.HTTP_201_CREATED)
