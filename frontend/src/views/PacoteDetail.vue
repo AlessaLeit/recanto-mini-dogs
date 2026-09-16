@@ -260,41 +260,35 @@
           </div>
         </div>
 
-        <div class="grid-form" v-if="cachorrosAdicionaisPacote.length === 0">
+        <!-- Um único bloco para os dois casos: com um cachorro só, o rótulo
+             fala em "Valor Base"; com mais de um, nomeia cada pet. Manter
+             ramos separados duplicava os campos (e os ids) sem necessidade. -->
+        <div class="grid-form">
           <div class="form-group">
-            <label for="valor-base">Valor Base Banho (R$)</label>
+            <label for="valor-base">
+              {{ cachorrosAdicionaisPacote.length === 0
+                ? 'Valor Base Banho (R$)'
+                : `Valor do Banho — ${cachorroPrincipalPacote?.nome} (R$)` }}
+            </label>
             <input id="valor-base" type="number" step="0.01" v-model.number="formPacote.valor_banho_base" @input="handleInputMudanca" />
           </div>
+
+          <div class="form-group" v-for="cachorro in cachorrosAdicionaisPacote" :key="cachorro.id">
+            <label :for="'valor-extra-' + cachorro.id">Valor do Banho — {{ cachorro.nome }} (R$)</label>
+            <input
+              :id="'valor-extra-' + cachorro.id"
+              type="number"
+              step="0.01"
+              v-model.number="formValoresCachorros[cachorro.id]"
+              @input="handleInputMudanca"
+            />
+          </div>
+
           <div class="form-group">
             <label for="transporte">Transporte Total (R$)</label>
             <input id="transporte" type="number" step="0.01" v-model.number="formPacote.valor_transporte" @input="handleInputMudanca" />
           </div>
         </div>
-
-        <template v-else>
-          <div class="grid-form">
-            <div class="form-group">
-              <label for="valor-base">Valor do Banho — {{ cachorroPrincipalPacote?.nome }} (R$)</label>
-              <input id="valor-base" type="number" step="0.01" v-model.number="formPacote.valor_banho_base" @input="handleInputMudanca" />
-            </div>
-            <div class="form-group" v-for="cachorro in cachorrosAdicionaisPacote" :key="cachorro.id">
-              <label :for="'valor-extra-' + cachorro.id">Valor do Banho — {{ cachorro.nome }} (R$)</label>
-              <input
-                :id="'valor-extra-' + cachorro.id"
-                type="number"
-                step="0.01"
-                v-model.number="formValoresCachorros[cachorro.id]"
-                @input="handleInputMudanca"
-              />
-            </div>
-          </div>
-          <div class="grid-form">
-            <div class="form-group">
-              <label for="transporte">Transporte Total (R$)</label>
-              <input id="transporte" type="number" step="0.01" v-model.number="formPacote.valor_transporte" @input="handleInputMudanca" />
-            </div>
-          </div>
-        </template>
 
         <div class="form-group form-highlight">
           <label for="valor-cobrado">Valor Total Cobrado (R$)</label>

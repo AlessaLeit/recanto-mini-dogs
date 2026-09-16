@@ -220,6 +220,22 @@ body {
 .grid-4 { grid-template-columns: repeat(4, 1fr); }
 
 /* ══ UTILITÁRIOS ══ */
+
+/* Rótulo lido por leitores de tela, invisível na interface. Usado em filtros
+   compactos onde um <label> visível quebraria o layout, mas o campo ainda
+   precisa ser identificável por quem navega sem enxergar a tela. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .header-actions {
   display: flex;
   justify-content: space-between;

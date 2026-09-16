@@ -12,9 +12,11 @@
           <option value="ano">Ano</option>
         </select>
         <template v-if="statsFiltro === 'periodo'">
-          <input type="date" v-model="statsPeriodoInicio" class="periodo-data" />
+          <label class="sr-only" for="periodo-inicio">Data inicial do período</label>
+          <input id="periodo-inicio" type="date" v-model="statsPeriodoInicio" class="periodo-data" />
           <span class="periodo-ate">até</span>
-          <input type="date" v-model="statsPeriodoFim" class="periodo-data" />
+          <label class="sr-only" for="periodo-fim">Data final do período</label>
+          <input id="periodo-fim" type="date" v-model="statsPeriodoFim" class="periodo-data" />
         </template>
       </div>
     </div>
@@ -55,7 +57,8 @@
           <div class="card-header-row">
             <div class="card-title" style="margin-bottom:0"><span class="card-title-bar"></span>📋 Agendamentos — {{ formatarData(dataSelecionada) }}</div>
             <div class="ag-header-actions">
-              <select v-model="turnoFiltro" @change="carregarAgendamentos()" class="select-turno">
+              <label class="sr-only" for="filtro-turno">Filtrar por turno</label>
+              <select id="filtro-turno" v-model="turnoFiltro" @change="carregarAgendamentos()" class="select-turno">
                 <option value="todos">Todos os turnos</option>
                 <option value="manha">Manhã</option>
                 <option value="tarde">Tarde</option>

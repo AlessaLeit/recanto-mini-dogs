@@ -66,7 +66,12 @@
             </div>
 
             <div v-else class="pagamento-inline">
-              <select v-model="formPagamento[bloco.pacote.id].tipo_pagamento" class="pag-select">
+              <select
+                :id="'pag-tipo-' + bloco.pacote.id"
+                aria-label="Forma de pagamento"
+                v-model="formPagamento[bloco.pacote.id].tipo_pagamento"
+                class="pag-select"
+              >
                 <option value="pix">Pix</option>
                 <option value="dinheiro">Dinheiro</option>
                 <option value="cartao_debito">Débito</option>
@@ -74,6 +79,8 @@
                 <option value="outro">Outro</option>
               </select>
               <input
+                :id="'pag-valor-' + bloco.pacote.id"
+                aria-label="Valor do pagamento"
                 type="number"
                 step="0.01"
                 v-model.number="formPagamento[bloco.pacote.id].valor_pago"
