@@ -51,12 +51,24 @@
               <span class="data-data">Transporte</span>
               <span class="data-valor">R$ {{ formatarValor(bloco.pacote.valor_transporte) }}</span>
             </div>
+
+            <!-- Fecha a coluna de valores somando o que está acima. -->
+            <div class="data-linha total-linha">
+              <span class="data-data">Total</span>
+              <span class="data-valor">R$ {{ formatarValor(bloco.total) }}</span>
+            </div>
           </div>
 
           <div class="bracket"></div>
 
           <div class="total-bloco">
-            <div class="total-valor">R$ {{ formatarValor(bloco.total) }}</div>
+            <!-- Pagamentos já recebidos deste pacote, só os valores; a forma
+                 de pagamento aparece em "Ver detalhes completos". -->
+            <div v-if="bloco.valoresPagos.length" class="pagamentos-feitos">
+              {{ bloco.valoresPagos.map(formatarValor).join(' + ') }}
+            </div>
+            <div class="total-rotulo">{{ bloco.saldoRestante > 0 ? 'Falta' : 'Quitado' }}</div>
+            <div class="total-valor">R$ {{ formatarValor(bloco.saldoRestante) }}</div>
             <span class="status-badge" :class="`status-${bloco.pacote.status_pagamento}`">
               {{ statusLabel(bloco.pacote.status_pagamento) }}
             </span>
@@ -189,8 +201,14 @@ const blocos = computed(() => {
     }, 0)
     const total = totalConcluidos + (pacote.valor_transporte || 0)
 
+    // Lado financeiro do bloco: o que já entrou e o que ainda falta. Usa
+    // valor_cobrado/valor_pago (dinheiro), e não o total acima, que soma os
+    // banhos efetivamente realizados — os dois divergem quando o pacote é
+    // pago adiantado ou algum banho não acontece.
+    const valoresPagos = (pacote.pagamentos || []).map(p => p.valor_pago || 0)
+    const saldoRestante = Math.max((pacote.valor_cobrado || 0) - (pacote.valor_pago || 0), 0)
+
     if (!formPagamento[pacote.id]) {
-      const saldoRestante = Math.max((pacote.valor_cobrado || 0) - (pacote.valor_pago || 0), 0)
       formPagamento[pacote.id] = { tipo_pagamento: 'pix', valor_pago: saldoRestante }
     }
 
@@ -200,7 +218,9 @@ const blocos = computed(() => {
       mesLabel: mesesNomes[dataRef.getMonth()],
       anoLabel: dataRef.getFullYear(),
       valorBanhoEquivalente,
-      total
+      total,
+      valoresPagos,
+      saldoRestante
     }
   })
 })
@@ -339,6 +359,30 @@ onMounted(carregarTudo)
   flex-shrink: 0; width: 200px;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 0.5rem; text-align: center;
+}
+/* Linha de total, fechando a coluna de datas/valores. */
+.data-linha.total-linha {
+  border-left-color: var(--marrom);
+  border-top: 2px solid var(--creme-escuro);
+  border-radius: 0 0 6px 6px;
+  font-weight: 800;
+  color: var(--marrom);
+  margin-top: 0.15rem;
+}
+
+/* Pagamentos já recebidos, em fonte menor acima do saldo. */
+.pagamentos-feitos {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--verde);
+}
+.total-rotulo {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  margin-top: -0.25rem;
 }
 .total-valor { font-size: 1.3rem; font-weight: 800; color: var(--marrom); }
 
