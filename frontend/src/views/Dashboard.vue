@@ -97,6 +97,24 @@
     </div>
 
     <div class="card">
+      <div class="card-title">
+        <span class="card-title-bar"></span>✅ Pacotes Fechados — {{ formatarData(dataSelecionada) }}
+      </div>
+      <div v-if="pacotesFechadosHoje.length === 0" class="empty-state">
+        Nenhum pacote se encerra nesta data
+      </div>
+      <div class="grid-3" v-else>
+        <PacoteCard
+          v-for="pacote in pacotesFechadosHoje"
+          :key="pacote.id"
+          :pacote="pacote"
+          @pagar="abrirPagamento"
+          @detalhes="verDetalhes"
+        />
+      </div>
+    </div>
+
+    <div class="card">
       <div class="card-title"><span class="card-title-bar"></span>📦 Pacotes em Aberto</div>
       <div v-if="pacotesEmAberto.length === 0" class="empty-state">
         Nenhum pacote em aberto
@@ -104,6 +122,27 @@
       <div class="grid-3" v-else>
         <PacoteCard
           v-for="pacote in pacotesEmAberto.slice(0, 6)"
+          :key="pacote.id"
+          :pacote="pacote"
+          @pagar="abrirPagamento"
+          @detalhes="verDetalhes"
+        />
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span class="card-title-bar"></span>⚠️ Pacotes Atrasados
+        <span v-if="pacotesAtrasados.length" class="contador-atrasados">
+          {{ pacotesAtrasados.length }}
+        </span>
+      </div>
+      <div v-if="pacotesAtrasados.length === 0" class="empty-state">
+        Nenhum pacote atrasado
+      </div>
+      <div class="grid-3" v-else>
+        <PacoteCard
+          v-for="pacote in pacotesAtrasados"
           :key="pacote.id"
           :pacote="pacote"
           @pagar="abrirPagamento"
@@ -291,12 +330,32 @@ const receitaPrevistaFiltrada = computed(() =>
   pacotesAtivosFiltrados.value.reduce((sum, p) => sum + (Number(p.valor_cobrado) || 0), 0)
 )
 
+// Data do último banho do pacote: é quando o ciclo se encerra, já que o
+// pacote fecha assim que todos os agendamentos são resolvidos.
+function dataFechamento(pacote) {
+  const datas = (pacote.agendamentos || []).map(a => a.data_banho).filter(Boolean)
+  return datas.length ? datas.sort().at(-1) : null
+}
+
+// Pacotes cujo ciclo termina no dia selecionado no calendário.
+const pacotesFechadosHoje = computed(() =>
+  pacotesStore.pacotes.filter(
+    p => p.ativo && dataFechamento(p) === dataSelecionada.value
+  )
+)
+
+// Em aberto: ainda devendo, sem estar atrasado (atrasado tem card próprio,
+// senão o mesmo pacote apareceria nos dois lugares).
 const pacotesEmAberto = computed(() =>
   pacotesStore.pacotes.filter(p => p.ativo && (
     p.status_pagamento === 'em_aberto' ||
-    p.status_pagamento === 'fechado' ||
-    p.status_pagamento === 'atrasado'
+    p.status_pagamento === 'fechado'
   ))
+)
+
+// Atrasado: o cliente já iniciou um pacote novo sem ter quitado este.
+const pacotesAtrasados = computed(() =>
+  pacotesStore.pacotes.filter(p => p.ativo && p.status_pagamento === 'atrasado')
 )
 const banhosRecentes = computed(() => {
   const banhos = []
@@ -554,6 +613,15 @@ onMounted(async () => {
   background: var(--dourado);
   border-radius: 2px;
   flex-shrink: 0;
+}
+/* Quantidade de pacotes atrasados, destacada ao lado do título. */
+.contador-atrasados {
+  background: #fdeaea;
+  color: #b94040;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 2px 9px;
+  border-radius: 999px;
 }
 .card-header-row {
   display: flex;
