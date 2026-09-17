@@ -123,13 +123,38 @@
     <div v-if="showModalEdit" class="modal-overlay" @click="showModalEdit = false">
       <div class="modal" @click.stop>
         <h3 class="modal-title">Editar Status — {{ agEdit.pet_nome }}</h3>
-        <div class="form-group">
+        <div class="form-group" v-if="!edicaoMultiPet">
           <label for="edit-status">Status</label>
           <select id="edit-status" v-model="agEdit.status_presenca">
             <option value="pendente">🟡 Pendente</option>
             <option value="concluido">🟢 Concluído</option>
             <option value="faltou">🔴 Faltou</option>
           </select>
+        </div>
+
+        <!-- Pacote com mais de um cachorro: um status por pet, pois cada um
+             pode faltar individualmente no mesmo dia. -->
+        <div class="form-group" v-else>
+          <label>Status por pet</label>
+          <div class="presencas-grid">
+            <div class="presenca-pet" v-for="cachorro in agEdit.cachorros" :key="cachorro.id">
+              <div class="presenca-pet-topo">
+                <span class="presenca-pet-nome">🐶 {{ cachorro.nome }}</span>
+                <span class="presenca-pet-valor">R$ {{ formatarValor(cachorro.valor) }}</span>
+              </div>
+              <label class="sr-only" :for="'edit-status-pet-' + cachorro.id">
+                Status de presença de {{ cachorro.nome }}
+              </label>
+              <select :id="'edit-status-pet-' + cachorro.id" v-model="agEdit.presencas[cachorro.id]">
+                <option value="pendente">🟡 Pendente</option>
+                <option value="concluido">🟢 Concluído</option>
+                <option value="faltou">🔴 Faltou</option>
+              </select>
+            </div>
+          </div>
+          <small class="helper-text">
+            Banho do dia: R$ {{ formatarValor(valorDiaEdicao) }} — só os pets concluídos são cobrados.
+          </small>
         </div>
         <div class="form-group">
           <label for="edit-turno">Turno</label>
@@ -323,9 +348,17 @@ function formatarData(dataStr) {
 function editarAgendamento(ag) {
   // Garante que 'extras' seja um objeto com as chaves esperadas
   const extras = ag.extras || {}
+  // Pacote com mais de um cachorro: cada pet tem seu próprio status, já que
+  // um pode faltar e o outro não. O backend manda o status atual de cada um
+  // em 'cachorros[].status'.
+  const presencas = {}
+  for (const c of ag.cachorros || []) {
+    presencas[c.id] = c.status || 'pendente'
+  }
   agEdit.value = {
     ...ag,
     turno: ag.turno || 'manha',
+    presencas,
     extras: {
       info: extras.info || '',
       valor_extra: extras.valor_extra || 0
@@ -333,13 +366,31 @@ function editarAgendamento(ag) {
   }
   showModalEdit.value = true
 }
+
+// Só faz sentido marcar pet a pet quando o pacote tem mais de um cachorro.
+const edicaoMultiPet = computed(() => (agEdit.value?.cachorros?.length || 0) > 1)
+
+// Prévia do valor do dia: soma apenas os pets marcados como concluídos.
+const valorDiaEdicao = computed(() =>
+  (agEdit.value?.cachorros || []).reduce(
+    (soma, c) => (agEdit.value.presencas?.[c.id] === 'concluido' ? soma + (c.valor || 0) : soma),
+    0
+  )
+)
 async function salvarAgendamento() {
   try {
-    await agendamentosStore.updateStatus(agEdit.value.id, {
-      status_presenca: agEdit.value.status_presenca,
+    const payload = {
       turno: agEdit.value.turno,
       extras: agEdit.value.extras
-    })
+    }
+    // Com vários pets, manda o status individual — o backend deriva daí o
+    // status do dia. Com um pet só, segue mandando o status do agendamento.
+    if (edicaoMultiPet.value) {
+      payload.presencas = { ...agEdit.value.presencas }
+    } else {
+      payload.status_presenca = agEdit.value.status_presenca
+    }
+    await agendamentosStore.updateStatus(agEdit.value.id, payload)
     showModalEdit.value = false
     alert('Agendamento atualizado!')
   } catch (err) {

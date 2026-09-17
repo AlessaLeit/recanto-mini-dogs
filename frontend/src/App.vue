@@ -236,6 +236,54 @@ body {
   border: 0;
 }
 
+/* ── PRESENÇA POR PET (pacotes multi-cachorro) ──
+   Global porque aparece em duas telas: no formulário do Detalhe do Pacote
+   e no modal de edição da Agenda. */
+.presencas-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.presenca-pet {
+  background: var(--creme);
+  border: 2px solid var(--creme-escuro);
+  border-radius: 8px;
+  padding: 0.7rem 0.8rem;
+}
+
+.presenca-pet-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.45rem;
+}
+
+.presenca-pet-nome {
+  font-weight: 800;
+  font-size: 0.88rem;
+  color: var(--marrom);
+}
+
+.presenca-pet-valor {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* Seletor mais específico de propósito: as telas estilizam '.form-group
+   select' em CSS scoped, que ganha especificidade extra do atributo
+   data-v-*. Sem isto, o fundo do select do pet seria sobreposto. */
+.presencas-grid .presenca-pet select { background: var(--white); }
+
+.helper-text {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  margin-top: 0.3rem;
+  display: block;
+  font-style: italic;
+}
+
 .header-actions {
   display: flex;
   justify-content: space-between;

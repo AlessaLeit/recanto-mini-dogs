@@ -1330,46 +1330,7 @@ onMounted(carregarPacote)
   color: var(--marrom);
 }
 
-/* ── PRESENÇA POR PET (pacotes multi-cachorro) ── */
-.presencas-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
-}
-
-.presenca-pet {
-  background: var(--creme);
-  border: 2px solid var(--creme-escuro);
-  border-radius: 8px;
-  padding: 0.7rem 0.8rem;
-}
-
-.presenca-pet-topo {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.45rem;
-}
-
-.presenca-pet-nome {
-  font-weight: 800;
-  font-size: 0.88rem;
-  color: var(--marrom);
-}
-
-.presenca-pet-valor {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--text-muted);
-}
-
-.presenca-pet select { background: var(--white); }
-
-.helper-text {
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  margin-top: 0.3rem;
-  display: block;
-  font-style: italic;
-}
+/* Os estilos de presença por pet (.presencas-grid, .presenca-pet*) e
+   .helper-text ficam no estilo global do App.vue, porque também são usados
+   pelo modal da Agenda (Dashboard.vue). */
 </style>
