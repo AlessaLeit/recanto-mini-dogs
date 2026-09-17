@@ -169,6 +169,10 @@ def criar_pacote(pacote_criar: schemas.PacoteCreate, db: Session = Depends(get_d
     db.commit()
     db.refresh(db_pacote)
 
+    # Pagamento adiantado do cliente entra como pagamento deste pacote.
+    from app.services import credito_service
+    credito_service.aplicar_creditos(db, db_pacote)
+
     # Retorna pacote com agendamentos carregados (para a resposta do endpoint)
     db_pacote = (
         db.query(models.Pacote)

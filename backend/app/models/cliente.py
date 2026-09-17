@@ -41,6 +41,19 @@ class Cliente(Base):
         cascade="all, delete-orphan",
         lazy="selectin"  # Carrega cachorros junto com cliente (evita N+1)
     )
-    
+
+    # Créditos: dinheiro pago que ainda não foi aplicado a um pacote
+    # (adiantamento ou sobra de pagamento).
+    creditos: Mapped[List["CreditoCliente"]] = relationship(
+        back_populates="cliente",
+        cascade="all, delete-orphan",
+    )
+
+    @property
+    def saldo_credito(self) -> float:
+        """Total de crédito disponível do cliente (soma dos créditos não consumidos)."""
+        return round(sum(c.saldo for c in (self.creditos or [])), 2)
+
+
     def __repr__(self) -> str:
         return f"<Cliente(id={self.id}, nome='{self.nome}')>"
