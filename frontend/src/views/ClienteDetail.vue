@@ -18,6 +18,53 @@
       </div>
     </div>
 
+    <!-- Crédito: dinheiro já pago que ainda não entrou em nenhum pacote.
+         Entra sozinho no próximo pacote que for criado. -->
+    <div class="credito-barra">
+      <div class="credito-info">
+        <span v-if="credito.saldo > 0" class="credito-saldo">
+          💰 Crédito disponível: <strong>R$ {{ formatarValor(credito.saldo) }}</strong>
+        </span>
+        <span v-else class="credito-vazio">Sem crédito adiantado</span>
+        <small class="credito-ajuda">Entra automaticamente no próximo pacote criado.</small>
+      </div>
+      <button @click="abrirAdiantado" class="btn-adiantado">+ Pagamento adiantado</button>
+    </div>
+
+    <div v-if="showAdiantado" class="modal-overlay" @click="showAdiantado = false">
+      <div class="modal-adiantado" @click.stop>
+        <h3>Pagamento adiantado</h3>
+        <p class="modal-ajuda">
+          Guarda o valor como crédito do cliente. Quando o próximo pacote for criado,
+          ele entra lá como pagamento automaticamente.
+        </p>
+
+        <div v-if="totalEmAberto > 0" class="aviso-pendencia">
+          ⚠️ Este cliente tem <strong>R$ {{ formatarValor(totalEmAberto) }}</strong> em aberto.
+          Confira se não é o pagamento de um pacote antigo.
+        </div>
+
+        <label for="adiantado-valor">Valor</label>
+        <input id="adiantado-valor" type="number" step="0.01" v-model.number="formAdiantado.valor" />
+
+        <label for="adiantado-tipo">Forma de pagamento</label>
+        <select id="adiantado-tipo" v-model="formAdiantado.tipo_pagamento">
+          <option value="pix">Pix</option>
+          <option value="dinheiro">Dinheiro</option>
+          <option value="cartao_debito">Débito</option>
+          <option value="cartao_credito">Crédito</option>
+          <option value="outro">Outro</option>
+        </select>
+
+        <div class="modal-acoes">
+          <button @click="showAdiantado = false" class="btn-cancelar">Cancelar</button>
+          <button @click="salvarAdiantado" class="btn-pagar" :disabled="salvandoAdiantado">
+            {{ salvandoAdiantado ? 'Salvando...' : 'Guardar crédito' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="empty-state">Carregando...</div>
     <div v-else-if="blocos.length === 0" class="empty-state">Nenhum pacote encontrado para este cliente.</div>
 
@@ -118,6 +165,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import clienteApi from '../api/clientes.js'
 import pacoteApi from '../api/pacotes.js'
+import creditoApi from '../api/creditos.js'
 import { usePacotesStore } from '../stores/pacotes.js'
 
 const route = useRoute()
@@ -225,15 +273,76 @@ const blocos = computed(() => {
   })
 })
 
+// ── Crédito (pagamento adiantado) ───────────────────────────────────────
+const credito = ref({ saldo: 0, creditos: [] })
+const showAdiantado = ref(false)
+const salvandoAdiantado = ref(false)
+const formAdiantado = reactive({ valor: null, tipo_pagamento: 'pix' })
+
+// Soma do que o cliente ainda deve, somando todos os pacotes. É isso que
+// dispara o aviso: quem tem pendência pode estar só esquecendo de dar baixa
+// num pacote antigo, em vez de realmente adiantando o próximo.
+const totalEmAberto = computed(() =>
+  pacotes.value.reduce(
+    (soma, p) => soma + Math.max((p.valor_cobrado || 0) - (p.valor_pago || 0), 0),
+    0
+  )
+)
+
+const pacotesPendentes = computed(() =>
+  pacotes.value.filter(p => (p.valor_cobrado || 0) - (p.valor_pago || 0) > 0.001)
+)
+
+function abrirAdiantado() {
+  formAdiantado.valor = null
+  formAdiantado.tipo_pagamento = 'pix'
+  showAdiantado.value = true
+}
+
+async function salvarAdiantado() {
+  if (!formAdiantado.valor || formAdiantado.valor <= 0) {
+    alert('Informe um valor válido.')
+    return
+  }
+  if (totalEmAberto.value > 0) {
+    const ok = confirm(
+      `Atenção: este cliente ainda tem R$ ${formatarValor(totalEmAberto.value)} em aberto ` +
+      `(${pacotesPendentes.value.length} pacote(s)).\n\n` +
+      `Guardar R$ ${formatarValor(formAdiantado.valor)} como pagamento adiantado mesmo assim?\n\n` +
+      `Se o cliente estiver quitando um pacote antigo, cancele e use o botão ` +
+      `"Marcar Pago" do pacote correspondente.`
+    )
+    if (!ok) return
+  }
+
+  salvandoAdiantado.value = true
+  try {
+    await creditoApi.registrar({
+      cliente_id: clienteId.value,
+      valor: formAdiantado.valor,
+      data_pagamento: new Date().toISOString().split('T')[0],
+      tipo_pagamento: formAdiantado.tipo_pagamento
+    })
+    showAdiantado.value = false
+    await carregarTudo()
+  } catch (err) {
+    alert('Erro ao registrar adiantamento: ' + (err.response?.data?.detail || err.message))
+  } finally {
+    salvandoAdiantado.value = false
+  }
+}
+
 async function carregarTudo() {
   loading.value = true
   try {
-    const [respCliente, respPacotes] = await Promise.all([
+    const [respCliente, respPacotes, respCredito] = await Promise.all([
       clienteApi.obter(clienteId.value),
-      pacoteApi.listar({ cliente_id: clienteId.value, incluir_inativos: true })
+      pacoteApi.listar({ cliente_id: clienteId.value, incluir_inativos: true }),
+      creditoApi.obterPorCliente(clienteId.value)
     ])
     cliente.value = respCliente.data
     pacotes.value = Array.isArray(respPacotes.data) ? respPacotes.data : []
+    credito.value = respCredito.data || { saldo: 0, creditos: [] }
   } catch (err) {
     alert('Erro ao carregar dados do cliente: ' + (err.response?.data?.detail || err.message))
   } finally {
@@ -360,6 +469,61 @@ onMounted(carregarTudo)
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 0.5rem; text-align: center;
 }
+/* ── CRÉDITO (pagamento adiantado) ── */
+.credito-barra {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; flex-wrap: wrap;
+  background: var(--white); border-radius: var(--radius);
+  padding: 0.9rem 1.2rem; margin-bottom: 1rem;
+  box-shadow: var(--shadow);
+  border-left: 4px solid var(--verde);
+}
+.credito-info { display: flex; flex-direction: column; gap: 2px; }
+.credito-saldo { font-size: 0.95rem; color: var(--text); }
+.credito-saldo strong { color: var(--verde); font-size: 1.05rem; }
+.credito-vazio { font-size: 0.9rem; color: var(--text-muted); }
+.credito-ajuda { font-size: 0.73rem; color: var(--text-muted); font-style: italic; }
+.btn-adiantado {
+  background: var(--verde); color: var(--white);
+  border: none; border-radius: 7px; padding: 0.55rem 1rem;
+  font-weight: 700; font-size: 0.88rem; cursor: pointer;
+}
+.btn-adiantado:hover { background: #5a7c3e; }
+
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center; z-index: 200;
+}
+.modal-adiantado {
+  background: var(--white); border-radius: var(--radius);
+  padding: 1.5rem; width: 100%; max-width: 380px;
+  display: flex; flex-direction: column; gap: 0.5rem;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+}
+.modal-adiantado h3 { color: var(--marrom); font-size: 1.1rem; }
+.modal-ajuda { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.3rem; }
+.modal-adiantado label {
+  font-size: 0.78rem; font-weight: 800; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.4px; margin-top: 0.4rem;
+}
+.modal-adiantado input, .modal-adiantado select {
+  padding: 0.6rem 0.8rem; border: 2px solid var(--creme-escuro);
+  border-radius: 7px; font-size: 0.95rem; font-family: inherit;
+  background: var(--creme); color: var(--text); outline: none;
+}
+.aviso-pendencia {
+  background: #fdeaea; color: #b94040;
+  border-radius: 7px; padding: 0.6rem 0.8rem;
+  font-size: 0.82rem; line-height: 1.4;
+}
+.modal-acoes { display: flex; gap: 0.5rem; margin-top: 1rem; }
+.modal-acoes button { flex: 1; }
+.btn-cancelar {
+  background: var(--creme-escuro); color: var(--marrom);
+  border: none; border-radius: 7px; padding: 0.55rem 1rem;
+  font-weight: 700; cursor: pointer;
+}
+
 /* Linha de total, fechando a coluna de datas/valores. */
 .data-linha.total-linha {
   border-left-color: var(--marrom);
