@@ -9,6 +9,16 @@
           <span v-if="cliente.endereco">📍 {{ cliente.endereco }}</span>
         </p>
       </div>
+
+      <!-- Crédito: dinheiro já pago que ainda não entrou em nenhum pacote.
+           Entra sozinho no próximo pacote que for criado. -->
+      <div class="credito-area">
+        <span v-if="credito.saldo > 0" class="credito-saldo">
+          💰 Crédito: <strong>R$ {{ formatarValor(credito.saldo) }}</strong>
+        </span>
+        <span v-else class="credito-vazio">Sem crédito adiantado</span>
+        <button @click="abrirAdiantado" class="btn-adiantado">+ Pagamento adiantado</button>
+      </div>
     </div>
 
     <!-- Resumo: tipo de pacote / dia da semana / cachorro -->
@@ -16,19 +26,6 @@
       <div v-for="linha in resumoLinhas" :key="linha.pet_nome" class="resumo-linha">
         <strong>{{ linha.tipo_plano_label }}</strong> · {{ linha.dia_semana_label }} — 🐾 {{ linha.pet_nome }}
       </div>
-    </div>
-
-    <!-- Crédito: dinheiro já pago que ainda não entrou em nenhum pacote.
-         Entra sozinho no próximo pacote que for criado. -->
-    <div class="credito-barra">
-      <div class="credito-info">
-        <span v-if="credito.saldo > 0" class="credito-saldo">
-          💰 Crédito disponível: <strong>R$ {{ formatarValor(credito.saldo) }}</strong>
-        </span>
-        <span v-else class="credito-vazio">Sem crédito adiantado</span>
-        <small class="credito-ajuda">Entra automaticamente no próximo pacote criado.</small>
-      </div>
-      <button @click="abrirAdiantado" class="btn-adiantado">+ Pagamento adiantado</button>
     </div>
 
     <div v-if="showAdiantado" class="modal-overlay" @click="showAdiantado = false">
@@ -403,6 +400,7 @@ onMounted(carregarTudo)
   display: flex; align-items: center; gap: 1rem;
   margin-bottom: 1.5rem; padding-bottom: 1.2rem;
   border-bottom: 2px solid var(--creme-escuro);
+  flex-wrap: wrap;
 }
 .btn-back {
   background: var(--creme-escuro); border: none; font-size: 0.9rem; font-weight: 700;
@@ -469,20 +467,17 @@ onMounted(carregarTudo)
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 0.5rem; text-align: center;
 }
-/* ── CRÉDITO (pagamento adiantado) ── */
-.credito-barra {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 1rem; flex-wrap: wrap;
-  background: var(--white); border-radius: var(--radius);
-  padding: 0.9rem 1.2rem; margin-bottom: 1rem;
-  box-shadow: var(--shadow);
-  border-left: 4px solid var(--verde);
+/* ── CRÉDITO (pagamento adiantado) ──
+   Fica na ponta direita do cabeçalho, na mesma linha do nome do cliente.
+   O 'margin-left: auto' empurra o bloco para a direita ocupando a sobra. */
+.credito-area {
+  margin-left: auto;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem;
+  text-align: right; flex-shrink: 0;
 }
-.credito-info { display: flex; flex-direction: column; gap: 2px; }
-.credito-saldo { font-size: 0.95rem; color: var(--text); }
-.credito-saldo strong { color: var(--verde); font-size: 1.05rem; }
-.credito-vazio { font-size: 0.9rem; color: var(--text-muted); }
-.credito-ajuda { font-size: 0.73rem; color: var(--text-muted); font-style: italic; }
+.credito-saldo { font-size: 0.88rem; color: var(--text); white-space: nowrap; }
+.credito-saldo strong { color: var(--verde); font-size: 1rem; }
+.credito-vazio { font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; }
 .btn-adiantado {
   background: var(--verde); color: var(--white);
   border: none; border-radius: 7px; padding: 0.55rem 1rem;
