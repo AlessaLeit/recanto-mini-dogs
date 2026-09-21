@@ -6,6 +6,44 @@ Sistema completo para gerenciamento de pacotes mensais de banho e tosa, controle
 
 ---
 
+## Telas do Sistema
+
+> As imagens abaixo foram geradas com dados fictícios, criados só para ilustração.
+
+### Agenda
+
+Painel inicial com os indicadores do período, calendário de banhos e os agendamentos do dia selecionado. Abaixo ficam os pacotes que se encerram na data, os que estão em aberto e os atrasados.
+
+![Agenda](docs/screenshots/agenda.png)
+
+### Histórico do cliente
+
+Todos os pacotes do cliente, do mais recente ao mais antigo. Cada bloco lista as datas de banho com o valor de cada dia, fecha com o total e, à direita, mostra os pagamentos recebidos e quanto falta quitar. No topo fica o crédito disponível — pagamento adiantado que entra sozinho no próximo pacote criado.
+
+![Histórico do cliente](docs/screenshots/cliente-historico.png)
+
+### Pacotes
+
+![Pacotes](docs/screenshots/pacotes.png)
+
+### Clientes
+
+![Clientes](docs/screenshots/clientes.png)
+
+### Relatório mensal
+
+Receita prevista, recebida e pendente do mês, com taxa de recebimento e a relação de pacotes em aberto.
+
+![Relatórios](docs/screenshots/relatorios.png)
+
+### Comandas para impressão
+
+Fila dos pacotes fechados de clientes que recebem a comanda em papel. O PDF sai com quatro comandas por folha A4.
+
+![Comandas](docs/screenshots/comandas.png)
+
+---
+
 ## Tecnologias
 
 | Camada | Tecnologia |
