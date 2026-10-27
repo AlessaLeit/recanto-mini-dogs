@@ -58,25 +58,49 @@ Fila dos pacotes fechados de clientes que recebem a comanda em papel. O PDF sai 
 
 ## Funcionalidades Principais
 
-### 1. Gestão de Clientes e Pets
-- Cadastro completo de clientes (nome, telefone, endereço)
-- Vínculo de múltiplos cachorros por cliente
-- Cadastro de pets com raça, porte e observações médicas/comportamentais
-- Busca e filtro de clientes
+### 1. Clientes e Pets
+- Cadastro de clientes com nome, WhatsApp, endereço e preferência de recebimento da comanda (WhatsApp ou impressa)
+- Vários cachorros por cliente, com raça, porte e observações
+- Busca de clientes
+- **Histórico do cliente:** todos os pacotes, do mais recente ao mais antigo, com as datas de banho e o valor de cada dia, o total do pacote, os pagamentos recebidos e quanto falta quitar
 
-### 2. Controle de Pacotes Mensais
-- Contratação de planos: Semanal (4 banhos), Quinzenal (2 banhos) ou Mensal (1 banho)
-- Definição de valor cobrado por banho
-- Geração automática de agendamentos ao criar pacote
-- Registro de pagamentos e controle de status (em aberto / pago)
-- Filtros por status de pagamento e ativação
+### 2. Pacotes Mensais
+- Planos Semanal (4 banhos), Quinzenal (2) ou Mensal (1), com dia da semana fixo
+- Agendamentos do mês gerados automaticamente ao criar o pacote
+- **Pacotes com mais de um cachorro** da mesma família, com valor de banho próprio para cada pet
+- Valor de transporte por pacote
+- **Fechamento automático:** quando todos os banhos do ciclo são resolvidos, o pacote fecha, a comanda é enviada e o pacote do mês seguinte é criado sozinho
+- Status de pagamento: em aberto, parcial, pago ou atrasado (cliente iniciou um pacote novo sem quitar o anterior)
 
-### 3. Agenda Dinâmica e Relatórios
-- Calendário interativo com visualização mensal
-- Controle de presença: pendente, concluído, faltou
-- Registro de extras e observações por banho
-- Relatórios mensais com receita prevista, recebida e pendente
-- Taxa de recebimento e listagem de pacotes em aberto
+### 3. Pagamentos e Crédito
+- Vários pagamentos por pacote, cada um com sua forma (Pix, dinheiro, débito, crédito)
+- **Pagamento adiantado:** o valor fica guardado como crédito do cliente
+- **Sobra vira crédito:** pagando mais do que o pacote custa, a diferença fica guardada em vez de se perder dentro do pacote
+- O crédito entra sozinho como pagamento no próximo pacote criado, preservando forma e data originais; se for maior que o pacote, o restante fica para o mês seguinte
+- Aviso ao registrar adiantamento para cliente com saldo em aberto, para evitar confundir com a baixa de um pacote antigo esquecido
+
+### 4. Agenda
+- Calendário mensal e agendamentos do dia, separados por turno (manhã e tarde)
+- Presença de cada banho: pendente, concluído ou faltou
+- **Presença por pet:** num pacote com dois cachorros, um pode faltar e o outro não, e só os presentes são cobrados
+- Itens extras e observações por banho, com valor adicional
+- Pacotes que se encerram na data selecionada, pacotes em aberto e pacotes atrasados
+- Indicadores filtráveis por dia, semana, mês, ano ou período
+
+### 5. Banhos Avulsos
+- Banhos sem pacote, para clientes eventuais, com valor e controle de pagamento próprios
+
+### 6. Comandas
+- **Por WhatsApp:** enviada automaticamente ao fechar o pacote, via Evolution API (conexão pelo QR Code na tela de WhatsApp)
+- **Impressa:** fila dos pacotes fechados e geração de PDF com quatro comandas por folha A4, no modelo do talão do canil
+
+### 7. Relatórios
+- Relatório mensal com banhos realizados, receita prevista, recebida e pendente
+- Taxa de recebimento e lista de pacotes em aberto, com o WhatsApp do cliente
+
+### 8. Segurança e Dados
+- Acesso por login, com todas as rotas da API exigindo autenticação
+- [Backup automático](scripts/backup/LEIAME.md) diário com cópia na nuvem e teste semanal de restauração
 
 ---
 
