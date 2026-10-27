@@ -1,0 +1,11 @@
+{
+  "pastaLocal": "C:\\RecantoBackups",
+  "destinos": [
+    "G:\\Meu Drive\\Backups Recanto Mini Dogs",
+    "E:\\Backups Recanto Mini Dogs"
+  ],
+  "manterDiarios": 30,
+  "manterMensais": 12,
+  "containerBanco": "postgres_db",
+  "containerBackend": "petshop_backend"
+}

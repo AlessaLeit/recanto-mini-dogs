@@ -172,6 +172,12 @@ BACKEND_PORT=8000
 
 ---
 
+## Backup dos dados
+
+O sistema roda localmente, então os dados dependem do disco da máquina. A pasta [`scripts/backup`](scripts/backup/LEIAME.md) tem o backup diário automático, com cópias na nuvem (Google Drive ou OneDrive) e em HD externo, rotação dos arquivos antigos e um teste semanal que confirma que os backups restauram. O passo a passo de instalação está no [LEIAME](scripts/backup/LEIAME.md).
+
+---
+
 ## Estrutura do Projeto
 
 ```
