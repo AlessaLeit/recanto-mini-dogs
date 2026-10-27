@@ -48,11 +48,12 @@ Fila dos pacotes fechados de clientes que recebem a comanda em papel. O PDF sai 
 
 | Camada | Tecnologia |
 |--------|-----------|
-| **Backend** | Python 3.11, FastAPI, SQLAlchemy 2.x, Alembic, Pydantic |
+| **Backend** | Python 3.11, FastAPI, SQLAlchemy 2.x, Alembic, Pydantic, JWT (python-jose) |
 | **Frontend** | Vue 3, Vite, Pinia, Vue Router, Axios |
 | **Banco de Dados** | SQLite (desenvolvimento) / PostgreSQL (produção) |
+| **Comandas** | ReportLab (PDF das comandas impressas) · Evolution API (envio por WhatsApp) |
 | **Infraestrutura** | Docker, Docker Compose, Nginx |
-| **Testes** | pytest, FastAPI TestClient |
+| **Testes** | pytest, pytest-cov, FastAPI TestClient |
 
 ---
 
@@ -236,18 +237,26 @@ PacotesBanho/
 
 ## API — Endpoints Principais
 
+Com exceção do login e do health check, todas as rotas exigem o token JWT no cabeçalho `Authorization: Bearer <token>`.
+
 | Método | Endpoint | Descrição |
 |--------|----------|-----------|
+| `POST` | `/api/v1/auth/login` | Login (devolve o token) |
 | `GET` | `/api/v1/clientes/` | Listar clientes |
 | `POST` | `/api/v1/clientes/` | Criar cliente |
 | `GET` | `/api/v1/cachorros/` | Listar cachorros |
 | `POST` | `/api/v1/cachorros/` | Criar cachorro |
-| `GET` | `/api/v1/pacotes/` | Listar pacotes |
-| `POST` | `/api/v1/pacotes/` | Criar pacote (gera agendamentos) |
-| `POST` | `/api/v1/pacotes/{id}/pagar` | Registrar pagamento |
-| `GET` | `/api/v1/agendamentos/` | Listar agendamentos |
-| `PUT` | `/api/v1/agendamentos/{id}` | Atualizar status de presença |
-| `GET` | `/api/v1/agendamentos/dashboard/{data}` | Dashboard do dia |
+| `GET` | `/api/v1/pacotes/` | Listar pacotes (filtros `cliente_id`, `cachorro_id`, `incluir_inativos`) |
+| `POST` | `/api/v1/pacotes/` | Criar pacote (gera agendamentos e aplica crédito do cliente) |
+| `PATCH` | `/api/v1/pacotes/{id}/pagar` | Registrar pagamento (corpo JSON; excedente vira crédito) |
+| `PATCH` | `/api/v1/pacotes/{id}/fechar` | Fechar pacote e enviar a comanda |
+| `GET` | `/api/v1/agendamentos/?pacote_id={id}` | Agendamentos de um pacote |
+| `PUT` | `/api/v1/agendamentos/{id}` | Atualizar presença (do dia ou por pet), turno e extras |
+| `GET` | `/api/v1/agendamentos/dashboard/{data}` | Agendamentos do dia, com os pets de cada pacote |
+| `POST` | `/api/v1/agendamentos/avulso` | Registrar banho avulso |
+| `GET` | `/api/v1/creditos/?cliente_id={id}` | Saldo de crédito do cliente |
+| `POST` | `/api/v1/creditos/` | Registrar pagamento adiantado |
+| `GET` | `/api/v1/comandas-impressao/pdf` | PDF das comandas pendentes (4 por folha A4) |
 | `GET` | `/api/v1/relatorios/mensal` | Relatório mensal |
 | `GET` | `/health` | Health check |
 
@@ -257,25 +266,28 @@ Documentação interativa: http://localhost:8000/docs
 
 ## Testes
 
-O projeto inclui testes de integração automatizados:
+Rode a partir da **raiz do projeto**, onde fica o `pytest.ini` (ele aponta o `pythonpath` para `backend/` e já gera o relatório de cobertura):
 
 ```bash
-cd test
-python run_integration.tests.py
+pip install -r requirements.txt pytest-cov
+pytest test/test_integracao.py test/test_unitario.py
 ```
 
-Cenários testados:
-- Cadastro de cliente válido e inválido
+Os testes de integração usam um banco SQLite em memória, então não precisam do Docker nem tocam nos dados reais.
+
+**Integração** (`test/test_integracao.py`):
+- Cadastro de cliente válido e sem nome
 - Criação de pacote com geração automática de agendamentos
 - Registro de pagamento
-- Visualização de banhos no calendário
-- Edição de status de presença
+- Agendamentos no calendário e edição do status de presença
+- Presença por pet em pacote com dois cachorros: só os presentes são cobrados; dia pendente enquanto algum pet estiver pendente; dia como "faltou" quando nenhum comparece; status individual preservado ao salvar extras; status do dia inteiro reaplicado a todos os pets
 
-Para executar com pytest:
-```bash
-cd backend
-pytest
-```
+**Unitários** (`test/test_unitario.py`):
+- Datas geradas para os planos semanal, quinzenal e mensal
+- Banhos sem transbordar para o mês seguinte
+- Cálculo do valor do plano
+
+O CI do GitHub roda os testes unitários a cada push e Pull Request na `master`.
 
 ---
 
