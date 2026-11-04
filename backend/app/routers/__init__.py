@@ -1,7 +1,8 @@
 """
 Routers FastAPI - Endpoints da API REST.
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.auth import get_current_user
 from .clientes import router as clientes_router
 from .cachorros import router as cachorros_router
 from .pacotes import router as pacotes_router

@@ -8,6 +8,7 @@ import Pacotes from "../views/Pacotes.vue";
 import Clientes from "../views/Clientes.vue";
 import Relatorios from "../views/Relatorios.vue";
 import Login from "../views/Login.vue";
+import AdminCanil from "../views/AdminCanil.vue";
 import PacoteDetail from "../views/PacoteDetail.vue";
 import BanhosAvulsos from "../views/BanhosAvulsos.vue";
 import ClienteDetail from "../views/ClienteDetail.vue";
@@ -26,6 +27,14 @@ const routes = [
     name: "Login",
     component: Login,
     meta: { hideHeader: true },
+  },
+  {
+    // Painel oculto de contas: sem link no menu e fora do login normal
+    // (protegido pela chave mestra no backend)
+    path: "/ale_admin_canil",
+    name: "AdminCanil",
+    component: AdminCanil,
+    meta: { hideHeader: true, publicPage: true },
   },
   {
     path: "/pacotes",
@@ -80,7 +89,9 @@ router.beforeEach((to, from, next) => {
   const token = localStorage.getItem("token");
   const isAuthenticated = !!token;
 
-  if (to.path !== "/login" && !isAuthenticated) {
+  if (to.meta.publicPage) {
+    next();
+  } else if (to.path !== "/login" && !isAuthenticated) {
     next("/login");
   } else if (to.path === "/login" && isAuthenticated) {
     next("/");

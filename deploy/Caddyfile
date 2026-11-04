@@ -1,0 +1,13 @@
+# HTTPS automático (Let's Encrypt). {$DOMAIN} vem do .env (ex.: pet.seudominio.com
+# ou seunome.duckdns.org). O DNS do domínio precisa apontar para o IP público da VM.
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	# O Caddy já envia X-Forwarded-For/-Proto com o IP real do cliente
+	reverse_proxy frontend:8080
+}
