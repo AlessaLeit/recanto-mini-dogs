@@ -33,7 +33,7 @@ services:
       DATABASE_SAVE_DATA_CHATS: "false"
       CACHE_REDIS_ENABLED: "false"
       CACHE_LOCAL_ENABLED: "true"
-      CORS_ORIGIN: "*"
+      CORS_ORIGIN: "http://localhost"  # só acessível internamente; não precisa de "*"
       LOG_LEVEL: "INFO"
     # Sem 'ports': só acessível dentro da rede interna do Docker, igual em dev.
     volumes:
@@ -56,6 +56,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres_local:5432/${POSTGRES_DB}
       DEBUG: "false"
+      APP_ENV: "production"
       LOG_LEVEL: "info"
       EVOLUTION_API_URL: http://evolution_api:8080
       EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
@@ -72,6 +73,10 @@ services:
       evolution_api:
         condition: service_started
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s
@@ -84,10 +89,8 @@ services:
   frontend:
     image: alessaleit/pacotesbanho-frontend:latest
     container_name: petshop_frontend
-    ports:
-      # O container roda nginx como usuário não-root, que não pode bindar a
-      # porta 80 internamente — por isso o nginx.conf escuta na 8080.
-      - "80:8080"
+    # Sem 'ports': quem recebe o tráfego público é o Caddy (HTTPS), que fala com
+    # o nginx do frontend pela rede Docker interna (porta 8080).
     environment:
       API_HOST: backend
       NGINX_ENVSUBST_FILTERED_ARGS: '$$API_HOST'
@@ -95,6 +98,34 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - petshop_network
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: petshop_caddy
+    environment:
+      DOMAIN: ${DOMAIN:?defina DOMAIN no .env}
+    ports:
+      - "80:80"    # necessário para o desafio do Let's Encrypt e redirect p/ HTTPS
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
     networks:
       - petshop_network
 
@@ -105,3 +136,5 @@ networks:
 volumes:
   pgdata:
   evolution_instances:
+  caddy_data:
+  caddy_config:

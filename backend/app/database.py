@@ -5,6 +5,7 @@ Suporta SQLite (desenvolvimento) e PostgreSQL (produção) via variável de ambi
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from sqlalchemy.pool import StaticPool
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Generator, Optional
 import os
@@ -29,11 +30,37 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str
     ADMIN_PASSWORD: str
 
+    # "production" ativa validações rígidas de segredos e desliga /docs
+    APP_ENV: str = "development"
+    # Origens permitidas no CORS, separadas por vírgula. Em produção o frontend
+    # e a API ficam na mesma origem (proxy do nginx), então normalmente é vazio.
+    CORS_ORIGINS: str = ""
+
     # Evolution API (WhatsApp) - opcional; se ausente, envio de comanda por
     # WhatsApp fica desabilitado sem quebrar o restante da aplicação.
     EVOLUTION_API_URL: Optional[str] = None
     EVOLUTION_API_KEY: Optional[str] = None
     EVOLUTION_INSTANCE_NAME: str = "recanto-minidogs"
+
+    @property
+    def is_production(self) -> bool:
+        return self.APP_ENV.strip().lower() == "production"
+
+    @model_validator(mode="after")
+    def _validar_segredos_em_producao(self):
+        """Em produção, recusa subir com segredos fracos ou de exemplo."""
+        if not self.is_production:
+            return self
+        problemas = []
+        if len(self.SECRET_KEY) < 32:
+            problemas.append("SECRET_KEY precisa ter pelo menos 32 caracteres")
+        if len(self.ADMIN_PASSWORD) < 12:
+            problemas.append("ADMIN_PASSWORD precisa ter pelo menos 12 caracteres")
+        if self.DEBUG:
+            problemas.append("DEBUG deve ser false")
+        if problemas:
+            raise ValueError("Configuração insegura para produção: " + "; ".join(problemas))
+        return self
 
 
 # Instância global das configurações
