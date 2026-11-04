@@ -70,7 +70,14 @@
             <td>R$ {{ formatarValor(ag.valor_avulso) }}</td>
             <td class="col-obs">{{ ag.extras?.info || '-' }}</td>
             <td>
-              <select :value="ag.status_presenca" @change="mudarStatus(ag, $event.target.value)" class="status-select" :class="ag.status_presenca">
+              <select
+                :id="'status-avulso-' + ag.id"
+                :aria-label="`Status de presença de ${ag.pet_nome_avulso || 'banho avulso'}`"
+                :value="ag.status_presenca"
+                @change="mudarStatus(ag, $event.target.value)"
+                class="status-select"
+                :class="ag.status_presenca"
+              >
                 <option value="pendente">🟡 Pendente</option>
                 <option value="concluido">🟢 Concluído</option>
                 <option value="faltou">🔴 Faltou</option>

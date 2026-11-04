@@ -69,10 +69,10 @@
             <input id="novo-cachorro" :value="`${cachorroSelecionado?.nome || ''} (pré-selecionado)`" disabled />
           </div>
           <div class="form-group" v-else>
-            <label for="novo-cachorro">Cachorro</label>
+            <label for="novo-cachorro-busca">Cachorro</label>
             <div class="autocomplete">
               <input
-                id="novo-cachorro"
+                id="novo-cachorro-busca"
                 v-model="buscaCachorroNovo"
                 type="text"
                 autocomplete="off"

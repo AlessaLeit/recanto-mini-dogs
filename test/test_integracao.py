@@ -125,10 +125,10 @@ def test_ct04_registro_pagamento_pacote():
     }).json()["id"]
     
     # Act
-    # Nota: o backend espera um corpo JSON (dict flexível) conforme definido em pacotes.py
+    # Nota: o endpoint recebe os dados no corpo da requisição, não em query params.
     pay_resp = client.patch(f"/api/v1/pacotes/{pac_id}/pagar", json={
         "valor_pago": 80.0,
-        "data_pagamento": "2024-05-20"
+        "data_pagamento": "2024-05-20",
     })
     
     # Assert

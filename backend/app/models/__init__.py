@@ -7,7 +7,7 @@ from .pacote import Pacote, TipoPlano, Pagamento, TipoPagamento
 from .banho import Banho
 from .agendamento import Agendamento, StatusPresenca
 from .comanda_impressao import ComandaImpressao
-from .usuario import Usuario
+from .credito_cliente import CreditoCliente
 
 __all__ = [
     "Cliente",
@@ -21,5 +21,5 @@ __all__ = [
     "Agendamento",
     "StatusPresenca",
     "ComandaImpressao",
-    "Usuario",
+    "CreditoCliente"
 ]
