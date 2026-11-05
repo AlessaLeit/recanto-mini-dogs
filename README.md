@@ -52,6 +52,20 @@ Sistema completo para gerenciamento de pacotes mensais de banho e tosa, controle
 
 ## Como Executar
 
+### Uso diário no Windows (Docker Desktop) — recomendado para a usuária final
+
+1. Uma vez só: dê dois cliques em `Criar atalho na Area de Trabalho.bat` (cria o ícone **Recanto Mini Dogs**).
+2. No dia a dia: dois cliques no ícone. Ele liga o Docker Desktop se preciso, inicia o sistema, faz uma
+   cópia de segurança do dia (em `Documentos\Backups Recanto Mini Dogs`, guarda 30 dias) e abre
+   `http://localhost` no navegador.
+3. Depois de atualizar o código (`git pull`): rode `Abrir Sistema.bat atualizar` uma vez.
+
+Requisitos: Docker Desktop instalado (marque "Start Docker Desktop when you sign in") e o arquivo `.env`
+na raiz do projeto. O sistema só responde neste computador (127.0.0.1); os dados ficam no volume Docker
+`pacotesbanho_pgdata`. Configuração em `docker-compose.local.yml`.
+
+---
+
 ### Opção 1: Windows — Start com 1 Clique
 
 Execute o arquivo `start.bat` na raiz do projeto:
