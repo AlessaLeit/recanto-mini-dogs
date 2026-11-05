@@ -9,7 +9,7 @@ from typing import List, Optional
 from datetime import date, timedelta
 import calendar
 from app.models import Pacote, Banho, Agendamento, Cachorro, Cliente, TipoPlano
-from app.services import comanda_service
+from app.services import comanda_service, credito_service
 
 
 _MAPA_DIA_SEMANA = {
@@ -161,16 +161,24 @@ class PacoteService:
 
         # Import local para evitar circularidade se necessário
         from app.models.pacote import Pagamento, TipoPagamento
+        from app.services import credito_service
 
-        # Criar novo registro de pagamento
-        novo_pagamento = Pagamento(
-            pacote_id=pacote_id,
-            valor_pago=valor_pago,
-            data_pagamento=data_pagamento,
-            tipo_pagamento=tipo_pagamento,
-            observacao=observacao
-        )
-        self.db.add(novo_pagamento)
+        # Pagou mais do que faltava? Só a parte que quita o pacote entra como
+        # pagamento dele; o excedente vira crédito do cliente, para ser usado
+        # no próximo pacote. Sem isso, o dinheiro extra ficaria escondido
+        # dentro de um pacote já quitado.
+        falta = round((pacote.valor_cobrado or 0.0) - (pacote.valor_pago_total or 0.0), 2)
+        excedente = round(valor_pago - falta, 2) if falta > 0 else round(valor_pago, 2)
+        valor_no_pacote = round(valor_pago - excedente, 2) if excedente > 0 else valor_pago
+
+        if valor_no_pacote > 0:
+            self.db.add(Pagamento(
+                pacote_id=pacote_id,
+                valor_pago=valor_no_pacote,
+                data_pagamento=data_pagamento,
+                tipo_pagamento=tipo_pagamento,
+                observacao=observacao
+            ))
 
         # Se solicitado fechar o pacote
         if fechar_pacote:
@@ -178,6 +186,20 @@ class PacoteService:
 
         self.db.commit()
         self.db.refresh(pacote)
+
+        # O excedente é guardado depois do commit do pagamento, para que a
+        # sobra só exista se o pagamento em si tiver sido gravado.
+        if excedente > 0 and pacote.cachorro and pacote.cachorro.cliente_id:
+            credito_service.registrar_credito(
+                self.db,
+                cliente_id=pacote.cachorro.cliente_id,
+                valor=excedente,
+                data_pagamento=data_pagamento,
+                tipo_pagamento=tipo_pagamento,
+                observacao=f"Sobra do pagamento do pacote #{pacote.id}",
+                origem_pacote_id=pacote.id,
+            )
+            self.db.refresh(pacote)
 
         if fechar_pacote:
             comanda_service.processar_fechamento(self.db, pacote)
@@ -305,4 +327,9 @@ class PacoteService:
 
         self.db.commit()
         self.db.refresh(novo_pacote)
+
+        # Se o cliente deixou pagamento adiantado, ele entra agora como
+        # pagamento deste pacote — é o caso de uso principal do crédito.
+        credito_service.aplicar_creditos(self.db, novo_pacote)
+
         return novo_pacote

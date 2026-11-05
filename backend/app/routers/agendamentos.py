@@ -6,13 +6,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database import get_db
+from app.auth import get_current_user
 from app.models import Agendamento
 from app.schemas import AgendamentoCreate, AgendamentoUpdate, AgendamentoResponse, AgendamentoAvulsoCreate
 from app.services.pacote_service import PacoteService
 from app.models import Pacote, Cachorro, Cliente
 from datetime import date
 
-router = APIRouter(tags=["Agendamentos"], redirect_slashes=True)
+router = APIRouter(
+    tags=["Agendamentos"],
+    redirect_slashes=True,
+    dependencies=[Depends(get_current_user)],
+)
 
 
 def _bloquear_se_pacote_fechado(agendamento: Agendamento) -> None:
@@ -112,12 +117,33 @@ def listar_agendamentos_data(
     result = []
     for ag in agendamentos:
         avulso = ag.pacote_id is None
+
+        # Cachorros do pacote com o valor de banho de cada um, para a agenda
+        # poder marcar presença pet a pet (num pacote com mais de um cachorro,
+        # um pode faltar e o outro não). O dict de valores é calculado uma vez
+        # por agendamento — é uma property, chamá-la dentro do laço dos pets
+        # recalcularia tudo a cada iteração.
+        cachorros_pacote = []
+        if not avulso and ag.pacote:
+            valores = ag.pacote.valor_banho_por_cachorro
+            cachorros_pacote = [
+                {
+                    "id": c.id,
+                    "nome": c.nome,
+                    "valor": valores.get(str(c.id), 0.0),
+                    "status": ag.presenca_do_cachorro(c.id),
+                }
+                for c in ag.pacote.cachorros_todos
+            ]
+
         ag_dict = {
             "id": ag.id,
             "pacote_id": ag.pacote_id,
             "avulso": avulso,
             "data_banho": ag.data_banho,
             "status_presenca": ag.status_presenca,
+            "presencas": ag.presencas,
+            "cachorros": cachorros_pacote,
             "turno": ag.turno,
             "extras": ag.extras,
             "valor_avulso": ag.valor_avulso,

@@ -29,3 +29,7 @@ test/.coverage
 
 *.db
 *.sqlite3
+# Backups do banco: contêm dados de clientes, nunca devem ir para o repositório.
+*.dump
+# Configuração de backup é específica de cada máquina (caminhos de pastas).
+scripts/backup/backup.config.json

@@ -5,13 +5,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Annotated, Optional
 from app.database import get_db
+from app.auth import get_current_user
 from app.models import Banho, Pacote, Cachorro, Cliente
 from app.schemas import BanhoCreate, BanhoUpdate, BanhoResponse
 from app.services.pacote_service import PacoteService
 
 BANHO_NOT_FOUND = "Banho não encontrado"
 
-router = APIRouter(redirect_slashes=True)
+router = APIRouter(
+    redirect_slashes=True,
+    dependencies=[Depends(get_current_user)],
+)
 
 
 @router.post("/", response_model=BanhoResponse, status_code=status.HTTP_201_CREATED)

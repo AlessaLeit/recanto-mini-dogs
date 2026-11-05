@@ -5,9 +5,13 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from typing import Dict, Any, Annotated
 from app.database import get_db
+from app.auth import get_current_user
 from app.services.relatorio_service import RelatorioService
 
-router = APIRouter(redirect_slashes=True)
+router = APIRouter(
+    redirect_slashes=True,
+    dependencies=[Depends(get_current_user)],
+)
 
 
 @router.get("/mensal")

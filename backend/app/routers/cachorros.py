@@ -5,12 +5,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional, Annotated
 from app.database import get_db
+from app.auth import get_current_user
 from app.models import Cachorro, Cliente
 from app.schemas import CachorroCreate, CachorroUpdate, CachorroResponse, CachorroWithPacotes
 
 CACHORRO_NOT_FOUND = "Cachorro não encontrado"
 
-router = APIRouter(tags=["Cachorros"], redirect_slashes=True)
+router = APIRouter(
+    tags=["Cachorros"],
+    redirect_slashes=True,
+    dependencies=[Depends(get_current_user)],
+)
 
 
 @router.post(

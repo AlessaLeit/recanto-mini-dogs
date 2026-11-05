@@ -14,8 +14,8 @@
         <li><router-link to="/banhos-avulsos">Banhos Avulsos</router-link></li>
         <li><router-link to="/clientes">Clientes</router-link></li>
         <li><router-link to="/relatorios">Relatórios</router-link></li>
-        <li><router-link to="/whatsapp">WhatsApp</router-link></li>
         <li><router-link to="/comandas-impressao">Comandas</router-link></li>
+        <li><router-link to="/whatsapp">WhatsApp</router-link></li>
       </ul>
     </nav>
 
@@ -220,6 +220,70 @@ body {
 .grid-4 { grid-template-columns: repeat(4, 1fr); }
 
 /* ══ UTILITÁRIOS ══ */
+
+/* Rótulo lido por leitores de tela, invisível na interface. Usado em filtros
+   compactos onde um <label> visível quebraria o layout, mas o campo ainda
+   precisa ser identificável por quem navega sem enxergar a tela. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── PRESENÇA POR PET (pacotes multi-cachorro) ──
+   Global porque aparece em duas telas: no formulário do Detalhe do Pacote
+   e no modal de edição da Agenda. */
+.presencas-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.presenca-pet {
+  background: var(--creme);
+  border: 2px solid var(--creme-escuro);
+  border-radius: 8px;
+  padding: 0.7rem 0.8rem;
+}
+
+.presenca-pet-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.45rem;
+}
+
+.presenca-pet-nome {
+  font-weight: 800;
+  font-size: 0.88rem;
+  color: var(--marrom);
+}
+
+.presenca-pet-valor {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* Seletor mais específico de propósito: as telas estilizam '.form-group
+   select' em CSS scoped, que ganha especificidade extra do atributo
+   data-v-*. Sem isto, o fundo do select do pet seria sobreposto. */
+.presencas-grid .presenca-pet select { background: var(--white); }
+
+.helper-text {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  margin-top: 0.3rem;
+  display: block;
+  font-style: italic;
+}
+
 .header-actions {
   display: flex;
   justify-content: space-between;

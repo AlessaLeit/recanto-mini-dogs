@@ -12,9 +12,11 @@
           <option value="ano">Ano</option>
         </select>
         <template v-if="statsFiltro === 'periodo'">
-          <input type="date" v-model="statsPeriodoInicio" class="periodo-data" />
+          <label class="sr-only" for="periodo-inicio">Data inicial do período</label>
+          <input id="periodo-inicio" type="date" v-model="statsPeriodoInicio" class="periodo-data" />
           <span class="periodo-ate">até</span>
-          <input type="date" v-model="statsPeriodoFim" class="periodo-data" />
+          <label class="sr-only" for="periodo-fim">Data final do período</label>
+          <input id="periodo-fim" type="date" v-model="statsPeriodoFim" class="periodo-data" />
         </template>
       </div>
     </div>
@@ -55,7 +57,8 @@
           <div class="card-header-row">
             <div class="card-title" style="margin-bottom:0"><span class="card-title-bar"></span>📋 Agendamentos — {{ formatarData(dataSelecionada) }}</div>
             <div class="ag-header-actions">
-              <select v-model="turnoFiltro" @change="carregarAgendamentos()" class="select-turno">
+              <label class="sr-only" for="filtro-turno">Filtrar por turno</label>
+              <select id="filtro-turno" v-model="turnoFiltro" @change="carregarAgendamentos()" class="select-turno">
                 <option value="todos">Todos os turnos</option>
                 <option value="manha">Manhã</option>
                 <option value="tarde">Tarde</option>
@@ -94,6 +97,24 @@
     </div>
 
     <div class="card">
+      <div class="card-title">
+        <span class="card-title-bar"></span>✅ Pacotes Fechados — {{ formatarData(dataSelecionada) }}
+      </div>
+      <div v-if="pacotesFechadosHoje.length === 0" class="empty-state">
+        Nenhum pacote se encerra nesta data
+      </div>
+      <div class="grid-3" v-else>
+        <PacoteCard
+          v-for="pacote in pacotesFechadosHoje"
+          :key="pacote.id"
+          :pacote="pacote"
+          @pagar="abrirPagamento"
+          @detalhes="verDetalhes"
+        />
+      </div>
+    </div>
+
+    <div class="card">
       <div class="card-title"><span class="card-title-bar"></span>📦 Pacotes em Aberto</div>
       <div v-if="pacotesEmAberto.length === 0" class="empty-state">
         Nenhum pacote em aberto
@@ -101,6 +122,27 @@
       <div class="grid-3" v-else>
         <PacoteCard
           v-for="pacote in pacotesEmAberto.slice(0, 6)"
+          :key="pacote.id"
+          :pacote="pacote"
+          @pagar="abrirPagamento"
+          @detalhes="verDetalhes"
+        />
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span class="card-title-bar"></span>⚠️ Pacotes Atrasados
+        <span v-if="pacotesAtrasados.length" class="contador-atrasados">
+          {{ pacotesAtrasados.length }}
+        </span>
+      </div>
+      <div v-if="pacotesAtrasados.length === 0" class="empty-state">
+        Nenhum pacote atrasado
+      </div>
+      <div class="grid-3" v-else>
+        <PacoteCard
+          v-for="pacote in pacotesAtrasados"
           :key="pacote.id"
           :pacote="pacote"
           @pagar="abrirPagamento"
@@ -120,13 +162,38 @@
     <div v-if="showModalEdit" class="modal-overlay" @click="showModalEdit = false">
       <div class="modal" @click.stop>
         <h3 class="modal-title">Editar Status — {{ agEdit.pet_nome }}</h3>
-        <div class="form-group">
+        <div class="form-group" v-if="!edicaoMultiPet">
           <label for="edit-status">Status</label>
           <select id="edit-status" v-model="agEdit.status_presenca">
             <option value="pendente">🟡 Pendente</option>
             <option value="concluido">🟢 Concluído</option>
             <option value="faltou">🔴 Faltou</option>
           </select>
+        </div>
+
+        <!-- Pacote com mais de um cachorro: um status por pet, pois cada um
+             pode faltar individualmente no mesmo dia. -->
+        <div class="form-group" v-else>
+          <label>Status por pet</label>
+          <div class="presencas-grid">
+            <div class="presenca-pet" v-for="cachorro in agEdit.cachorros" :key="cachorro.id">
+              <div class="presenca-pet-topo">
+                <span class="presenca-pet-nome">🐶 {{ cachorro.nome }}</span>
+                <span class="presenca-pet-valor">R$ {{ formatarValor(cachorro.valor) }}</span>
+              </div>
+              <label class="sr-only" :for="'edit-status-pet-' + cachorro.id">
+                Status de presença de {{ cachorro.nome }}
+              </label>
+              <select :id="'edit-status-pet-' + cachorro.id" v-model="agEdit.presencas[cachorro.id]">
+                <option value="pendente">🟡 Pendente</option>
+                <option value="concluido">🟢 Concluído</option>
+                <option value="faltou">🔴 Faltou</option>
+              </select>
+            </div>
+          </div>
+          <small class="helper-text">
+            Banho do dia: R$ {{ formatarValor(valorDiaEdicao) }} — só os pets concluídos são cobrados.
+          </small>
         </div>
         <div class="form-group">
           <label for="edit-turno">Turno</label>
@@ -263,12 +330,32 @@ const receitaPrevistaFiltrada = computed(() =>
   pacotesAtivosFiltrados.value.reduce((sum, p) => sum + (Number(p.valor_cobrado) || 0), 0)
 )
 
+// Data do último banho do pacote: é quando o ciclo se encerra, já que o
+// pacote fecha assim que todos os agendamentos são resolvidos.
+function dataFechamento(pacote) {
+  const datas = (pacote.agendamentos || []).map(a => a.data_banho).filter(Boolean)
+  return datas.length ? datas.sort().at(-1) : null
+}
+
+// Pacotes cujo ciclo termina no dia selecionado no calendário.
+const pacotesFechadosHoje = computed(() =>
+  pacotesStore.pacotes.filter(
+    p => p.ativo && dataFechamento(p) === dataSelecionada.value
+  )
+)
+
+// Em aberto: ainda devendo, sem estar atrasado (atrasado tem card próprio,
+// senão o mesmo pacote apareceria nos dois lugares).
 const pacotesEmAberto = computed(() =>
   pacotesStore.pacotes.filter(p => p.ativo && (
     p.status_pagamento === 'em_aberto' ||
-    p.status_pagamento === 'fechado' ||
-    p.status_pagamento === 'atrasado'
+    p.status_pagamento === 'fechado'
   ))
+)
+
+// Atrasado: o cliente já iniciou um pacote novo sem ter quitado este.
+const pacotesAtrasados = computed(() =>
+  pacotesStore.pacotes.filter(p => p.ativo && p.status_pagamento === 'atrasado')
 )
 const banhosRecentes = computed(() => {
   const banhos = []
@@ -320,9 +407,17 @@ function formatarData(dataStr) {
 function editarAgendamento(ag) {
   // Garante que 'extras' seja um objeto com as chaves esperadas
   const extras = ag.extras || {}
+  // Pacote com mais de um cachorro: cada pet tem seu próprio status, já que
+  // um pode faltar e o outro não. O backend manda o status atual de cada um
+  // em 'cachorros[].status'.
+  const presencas = {}
+  for (const c of ag.cachorros || []) {
+    presencas[c.id] = c.status || 'pendente'
+  }
   agEdit.value = {
     ...ag,
     turno: ag.turno || 'manha',
+    presencas,
     extras: {
       info: extras.info || '',
       valor_extra: extras.valor_extra || 0
@@ -330,13 +425,31 @@ function editarAgendamento(ag) {
   }
   showModalEdit.value = true
 }
+
+// Só faz sentido marcar pet a pet quando o pacote tem mais de um cachorro.
+const edicaoMultiPet = computed(() => (agEdit.value?.cachorros?.length || 0) > 1)
+
+// Prévia do valor do dia: soma apenas os pets marcados como concluídos.
+const valorDiaEdicao = computed(() =>
+  (agEdit.value?.cachorros || []).reduce(
+    (soma, c) => (agEdit.value.presencas?.[c.id] === 'concluido' ? soma + (c.valor || 0) : soma),
+    0
+  )
+)
 async function salvarAgendamento() {
   try {
-    await agendamentosStore.updateStatus(agEdit.value.id, {
-      status_presenca: agEdit.value.status_presenca,
+    const payload = {
       turno: agEdit.value.turno,
       extras: agEdit.value.extras
-    })
+    }
+    // Com vários pets, manda o status individual — o backend deriva daí o
+    // status do dia. Com um pet só, segue mandando o status do agendamento.
+    if (edicaoMultiPet.value) {
+      payload.presencas = { ...agEdit.value.presencas }
+    } else {
+      payload.status_presenca = agEdit.value.status_presenca
+    }
+    await agendamentosStore.updateStatus(agEdit.value.id, payload)
     showModalEdit.value = false
     alert('Agendamento atualizado!')
   } catch (err) {
@@ -500,6 +613,15 @@ onMounted(async () => {
   background: var(--dourado);
   border-radius: 2px;
   flex-shrink: 0;
+}
+/* Quantidade de pacotes atrasados, destacada ao lado do título. */
+.contador-atrasados {
+  background: #fdeaea;
+  color: #b94040;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 2px 9px;
+  border-radius: 999px;
 }
 .card-header-row {
   display: flex;

@@ -9,12 +9,56 @@
           <span v-if="cliente.endereco">📍 {{ cliente.endereco }}</span>
         </p>
       </div>
+
+      <!-- Crédito: dinheiro já pago que ainda não entrou em nenhum pacote.
+           Entra sozinho no próximo pacote que for criado. -->
+      <div class="credito-area">
+        <span v-if="credito.saldo > 0" class="credito-saldo">
+          💰 Crédito: <strong>R$ {{ formatarValor(credito.saldo) }}</strong>
+        </span>
+        <span v-else class="credito-vazio">Sem crédito adiantado</span>
+        <button @click="abrirAdiantado" class="btn-adiantado">+ Pagamento adiantado</button>
+      </div>
     </div>
 
     <!-- Resumo: tipo de pacote / dia da semana / cachorro -->
     <div class="resumo-card" v-if="resumoLinhas.length">
       <div v-for="linha in resumoLinhas" :key="linha.pet_nome" class="resumo-linha">
         <strong>{{ linha.tipo_plano_label }}</strong> · {{ linha.dia_semana_label }} — 🐾 {{ linha.pet_nome }}
+      </div>
+    </div>
+
+    <div v-if="showAdiantado" class="modal-overlay" @click="showAdiantado = false">
+      <div class="modal-adiantado" @click.stop>
+        <h3>Pagamento adiantado</h3>
+        <p class="modal-ajuda">
+          Guarda o valor como crédito do cliente. Quando o próximo pacote for criado,
+          ele entra lá como pagamento automaticamente.
+        </p>
+
+        <div v-if="totalEmAberto > 0" class="aviso-pendencia">
+          ⚠️ Este cliente tem <strong>R$ {{ formatarValor(totalEmAberto) }}</strong> em aberto.
+          Confira se não é o pagamento de um pacote antigo.
+        </div>
+
+        <label for="adiantado-valor">Valor</label>
+        <input id="adiantado-valor" type="number" step="0.01" v-model.number="formAdiantado.valor" />
+
+        <label for="adiantado-tipo">Forma de pagamento</label>
+        <select id="adiantado-tipo" v-model="formAdiantado.tipo_pagamento">
+          <option value="pix">Pix</option>
+          <option value="dinheiro">Dinheiro</option>
+          <option value="cartao_debito">Débito</option>
+          <option value="cartao_credito">Crédito</option>
+          <option value="outro">Outro</option>
+        </select>
+
+        <div class="modal-acoes">
+          <button @click="showAdiantado = false" class="btn-cancelar">Cancelar</button>
+          <button @click="salvarAdiantado" class="btn-pagar" :disabled="salvandoAdiantado">
+            {{ salvandoAdiantado ? 'Salvando...' : 'Guardar crédito' }}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -51,12 +95,24 @@
               <span class="data-data">Transporte</span>
               <span class="data-valor">R$ {{ formatarValor(bloco.pacote.valor_transporte) }}</span>
             </div>
+
+            <!-- Fecha a coluna de valores somando o que está acima. -->
+            <div class="data-linha total-linha">
+              <span class="data-data">Total</span>
+              <span class="data-valor">R$ {{ formatarValor(bloco.total) }}</span>
+            </div>
           </div>
 
           <div class="bracket"></div>
 
           <div class="total-bloco">
-            <div class="total-valor">R$ {{ formatarValor(bloco.total) }}</div>
+            <!-- Pagamentos já recebidos deste pacote, só os valores; a forma
+                 de pagamento aparece em "Ver detalhes completos". -->
+            <div v-if="bloco.valoresPagos.length" class="pagamentos-feitos">
+              {{ bloco.valoresPagos.map(formatarValor).join(' + ') }}
+            </div>
+            <div class="total-rotulo">{{ bloco.saldoRestante > 0 ? 'Falta' : 'Quitado' }}</div>
+            <div class="total-valor">R$ {{ formatarValor(bloco.saldoRestante) }}</div>
             <span class="status-badge" :class="`status-${bloco.pacote.status_pagamento}`">
               {{ statusLabel(bloco.pacote.status_pagamento) }}
             </span>
@@ -66,7 +122,12 @@
             </div>
 
             <div v-else class="pagamento-inline">
-              <select v-model="formPagamento[bloco.pacote.id].tipo_pagamento" class="pag-select">
+              <select
+                :id="'pag-tipo-' + bloco.pacote.id"
+                aria-label="Forma de pagamento"
+                v-model="formPagamento[bloco.pacote.id].tipo_pagamento"
+                class="pag-select"
+              >
                 <option value="pix">Pix</option>
                 <option value="dinheiro">Dinheiro</option>
                 <option value="cartao_debito">Débito</option>
@@ -74,6 +135,8 @@
                 <option value="outro">Outro</option>
               </select>
               <input
+                :id="'pag-valor-' + bloco.pacote.id"
+                aria-label="Valor do pagamento"
                 type="number"
                 step="0.01"
                 v-model.number="formPagamento[bloco.pacote.id].valor_pago"
@@ -99,6 +162,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import clienteApi from '../api/clientes.js'
 import pacoteApi from '../api/pacotes.js'
+import creditoApi from '../api/creditos.js'
 import { usePacotesStore } from '../stores/pacotes.js'
 
 const route = useRoute()
@@ -182,8 +246,14 @@ const blocos = computed(() => {
     }, 0)
     const total = totalConcluidos + (pacote.valor_transporte || 0)
 
+    // Lado financeiro do bloco: o que já entrou e o que ainda falta. Usa
+    // valor_cobrado/valor_pago (dinheiro), e não o total acima, que soma os
+    // banhos efetivamente realizados — os dois divergem quando o pacote é
+    // pago adiantado ou algum banho não acontece.
+    const valoresPagos = (pacote.pagamentos || []).map(p => p.valor_pago || 0)
+    const saldoRestante = Math.max((pacote.valor_cobrado || 0) - (pacote.valor_pago || 0), 0)
+
     if (!formPagamento[pacote.id]) {
-      const saldoRestante = Math.max((pacote.valor_cobrado || 0) - (pacote.valor_pago || 0), 0)
       formPagamento[pacote.id] = { tipo_pagamento: 'pix', valor_pago: saldoRestante }
     }
 
@@ -193,20 +263,83 @@ const blocos = computed(() => {
       mesLabel: mesesNomes[dataRef.getMonth()],
       anoLabel: dataRef.getFullYear(),
       valorBanhoEquivalente,
-      total
+      total,
+      valoresPagos,
+      saldoRestante
     }
   })
 })
 
+// ── Crédito (pagamento adiantado) ───────────────────────────────────────
+const credito = ref({ saldo: 0, creditos: [] })
+const showAdiantado = ref(false)
+const salvandoAdiantado = ref(false)
+const formAdiantado = reactive({ valor: null, tipo_pagamento: 'pix' })
+
+// Soma do que o cliente ainda deve, somando todos os pacotes. É isso que
+// dispara o aviso: quem tem pendência pode estar só esquecendo de dar baixa
+// num pacote antigo, em vez de realmente adiantando o próximo.
+const totalEmAberto = computed(() =>
+  pacotes.value.reduce(
+    (soma, p) => soma + Math.max((p.valor_cobrado || 0) - (p.valor_pago || 0), 0),
+    0
+  )
+)
+
+const pacotesPendentes = computed(() =>
+  pacotes.value.filter(p => (p.valor_cobrado || 0) - (p.valor_pago || 0) > 0.001)
+)
+
+function abrirAdiantado() {
+  formAdiantado.valor = null
+  formAdiantado.tipo_pagamento = 'pix'
+  showAdiantado.value = true
+}
+
+async function salvarAdiantado() {
+  if (!formAdiantado.valor || formAdiantado.valor <= 0) {
+    alert('Informe um valor válido.')
+    return
+  }
+  if (totalEmAberto.value > 0) {
+    const ok = confirm(
+      `Atenção: este cliente ainda tem R$ ${formatarValor(totalEmAberto.value)} em aberto ` +
+      `(${pacotesPendentes.value.length} pacote(s)).\n\n` +
+      `Guardar R$ ${formatarValor(formAdiantado.valor)} como pagamento adiantado mesmo assim?\n\n` +
+      `Se o cliente estiver quitando um pacote antigo, cancele e use o botão ` +
+      `"Marcar Pago" do pacote correspondente.`
+    )
+    if (!ok) return
+  }
+
+  salvandoAdiantado.value = true
+  try {
+    await creditoApi.registrar({
+      cliente_id: clienteId.value,
+      valor: formAdiantado.valor,
+      data_pagamento: new Date().toISOString().split('T')[0],
+      tipo_pagamento: formAdiantado.tipo_pagamento
+    })
+    showAdiantado.value = false
+    await carregarTudo()
+  } catch (err) {
+    alert('Erro ao registrar adiantamento: ' + (err.response?.data?.detail || err.message))
+  } finally {
+    salvandoAdiantado.value = false
+  }
+}
+
 async function carregarTudo() {
   loading.value = true
   try {
-    const [respCliente, respPacotes] = await Promise.all([
+    const [respCliente, respPacotes, respCredito] = await Promise.all([
       clienteApi.obter(clienteId.value),
-      pacoteApi.listar({ cliente_id: clienteId.value, incluir_inativos: true })
+      pacoteApi.listar({ cliente_id: clienteId.value, incluir_inativos: true }),
+      creditoApi.obterPorCliente(clienteId.value)
     ])
     cliente.value = respCliente.data
     pacotes.value = Array.isArray(respPacotes.data) ? respPacotes.data : []
+    credito.value = respCredito.data || { saldo: 0, creditos: [] }
   } catch (err) {
     alert('Erro ao carregar dados do cliente: ' + (err.response?.data?.detail || err.message))
   } finally {
@@ -267,6 +400,7 @@ onMounted(carregarTudo)
   display: flex; align-items: center; gap: 1rem;
   margin-bottom: 1.5rem; padding-bottom: 1.2rem;
   border-bottom: 2px solid var(--creme-escuro);
+  flex-wrap: wrap;
 }
 .btn-back {
   background: var(--creme-escuro); border: none; font-size: 0.9rem; font-weight: 700;
@@ -332,6 +466,82 @@ onMounted(carregarTudo)
   flex-shrink: 0; width: 200px;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 0.5rem; text-align: center;
+}
+/* ── CRÉDITO (pagamento adiantado) ──
+   Fica na ponta direita do cabeçalho, na mesma linha do nome do cliente.
+   O 'margin-left: auto' empurra o bloco para a direita ocupando a sobra. */
+.credito-area {
+  margin-left: auto;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem;
+  text-align: right; flex-shrink: 0;
+}
+.credito-saldo { font-size: 0.88rem; color: var(--text); white-space: nowrap; }
+.credito-saldo strong { color: var(--verde); font-size: 1rem; }
+.credito-vazio { font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; }
+.btn-adiantado {
+  background: var(--verde); color: var(--white);
+  border: none; border-radius: 7px; padding: 0.55rem 1rem;
+  font-weight: 700; font-size: 0.88rem; cursor: pointer;
+}
+.btn-adiantado:hover { background: #5a7c3e; }
+
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center; z-index: 200;
+}
+.modal-adiantado {
+  background: var(--white); border-radius: var(--radius);
+  padding: 1.5rem; width: 100%; max-width: 380px;
+  display: flex; flex-direction: column; gap: 0.5rem;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+}
+.modal-adiantado h3 { color: var(--marrom); font-size: 1.1rem; }
+.modal-ajuda { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.3rem; }
+.modal-adiantado label {
+  font-size: 0.78rem; font-weight: 800; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.4px; margin-top: 0.4rem;
+}
+.modal-adiantado input, .modal-adiantado select {
+  padding: 0.6rem 0.8rem; border: 2px solid var(--creme-escuro);
+  border-radius: 7px; font-size: 0.95rem; font-family: inherit;
+  background: var(--creme); color: var(--text); outline: none;
+}
+.aviso-pendencia {
+  background: #fdeaea; color: #b94040;
+  border-radius: 7px; padding: 0.6rem 0.8rem;
+  font-size: 0.82rem; line-height: 1.4;
+}
+.modal-acoes { display: flex; gap: 0.5rem; margin-top: 1rem; }
+.modal-acoes button { flex: 1; }
+.btn-cancelar {
+  background: var(--creme-escuro); color: var(--marrom);
+  border: none; border-radius: 7px; padding: 0.55rem 1rem;
+  font-weight: 700; cursor: pointer;
+}
+
+/* Linha de total, fechando a coluna de datas/valores. */
+.data-linha.total-linha {
+  border-left-color: var(--marrom);
+  border-top: 2px solid var(--creme-escuro);
+  border-radius: 0 0 6px 6px;
+  font-weight: 800;
+  color: var(--marrom);
+  margin-top: 0.15rem;
+}
+
+/* Pagamentos já recebidos, em fonte menor acima do saldo. */
+.pagamentos-feitos {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--verde);
+}
+.total-rotulo {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  margin-top: -0.25rem;
 }
 .total-valor { font-size: 1.3rem; font-weight: 800; color: var(--marrom); }
 
