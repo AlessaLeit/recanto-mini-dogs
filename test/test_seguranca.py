@@ -20,6 +20,7 @@ ROTAS_PROTEGIDAS = [
     "/api/v1/relatorios/mensal?ano=2024&mes=5",
     "/api/v1/whatsapp/status",
     "/api/v1/comandas-impressao/pendentes",
+    "/api/v1/creditos/",
 ]
 
 PAINEL = "/api/v1/admin-canil/usuarios"

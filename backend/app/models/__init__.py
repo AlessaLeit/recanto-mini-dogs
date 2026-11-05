@@ -8,6 +8,7 @@ from .banho import Banho
 from .agendamento import Agendamento, StatusPresenca
 from .comanda_impressao import ComandaImpressao
 from .credito_cliente import CreditoCliente
+from .usuario import Usuario
 
 __all__ = [
     "Cliente",
@@ -21,5 +22,6 @@ __all__ = [
     "Agendamento",
     "StatusPresenca",
     "ComandaImpressao",
-    "CreditoCliente"
+    "CreditoCliente",
+    "Usuario",
 ]
